@@ -1047,7 +1047,8 @@ export class AdminService {
         entityType,
         entityId,
         actorId: actorUserId,
-        metadata: metadata ?? undefined,
+        metadata:
+          metadata != null ? (metadata as Prisma.InputJsonValue) : undefined,
       },
     });
   }
