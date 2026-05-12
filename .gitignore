@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+coverage
+.idea
+.vscode
+*.log
+var/
+*.tsbuildinfo
+prisma/seed.js
+prisma/seed.js.map
+prisma/seed.d.ts

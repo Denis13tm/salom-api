@@ -1,0 +1,937 @@
+// Salom Taxi — domain model (Phase 2). Order (dispatch) va Trip (transport) alohida.
+// MapLibre: DB bilan bog‘liq emas; mobil MapLibre migratsiyasi alohida.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ——— Enums ———
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+  DRIVER
+}
+
+enum UserAccountStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+}
+
+enum DriverOperationalStatus {
+  OFFLINE
+  ONLINE_IDLE
+  ORDER_OFFERED
+  EN_ROUTE_PICKUP
+  ARRIVED_PICKUP
+  IN_TRIP
+  PAUSED
+  SUSPENDED
+}
+
+enum OrderStatus {
+  CREATED
+  BROADCASTED
+  ACCEPTED
+  DRIVER_ARRIVING
+  PASSENGER_ONBOARD
+  COMPLETED
+  CANCELLED_BY_OPERATOR
+  CANCELLED_BY_DRIVER
+  CANCELLED_BY_PASSENGER
+  EXPIRED
+}
+
+enum OrderAssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  SUPERSEDED
+}
+
+enum TripStatus {
+  NOT_STARTED
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  /// Operatsion bekor (cancel / no-show / dispute yechimi)
+  CANCELLED
+}
+
+enum TripEventType {
+  TRIP_RESERVED
+  DRIVER_ARRIVED_AT_PICKUP
+  PASSENGER_ONBOARD
+  TRIP_STARTED
+  TRIP_ENDED
+  FARE_FINALIZED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  NOTE
+}
+
+enum PaymentType {
+  CASH
+  CARD
+  OTHER
+}
+
+enum FareMode {
+  FIXED_CITY
+  OPERATOR_ENTERED
+  DISTANCE_BASED
+  /// 5000 + km * (so‘m): operator narx kiritmasin; hisob: GPS, to‘xtaganda hisobga olinmaydi
+  METERED
+}
+
+enum DriverDocumentType {
+  LICENSE
+  VEHICLE_REG
+  PHOTO
+  OTHER
+  /// Haydovchilik guvohnomasi: oldi
+  LICENSE_FRONT
+  /// Haydovchilik guvohnomasi: orqa
+  LICENSE_BACK
+  /// Haydovchi guvohnomani o‘zi ushlab turgan surat
+  LICENSE_HOLD
+}
+
+enum DriverDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum EarningsLedgerType {
+  TOP_UP
+  TRIP_COMMISSION_DEBIT
+  MANUAL_ADJUSTMENT_PLUS
+  MANUAL_ADJUSTMENT_MINUS
+  MONTHLY_SETTLEMENT
+  REFUND
+  BONUS_CREDIT
+  TRIP_EARNINGS
+  BONUS
+  ADJUSTMENT
+  SUBSCRIPTION_FEE
+  PAYOUT
+  OTHER
+}
+
+enum DriverSubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum NotificationChannel {
+  PUSH
+  IN_APP
+  SMS
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum SmsDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum SupportTicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+/// Haydovchi ↔ operator / administrator yozishmalari (panel + mobil)
+enum ChatMessageSender {
+  DRIVER
+  OPERATOR
+  ADMIN
+}
+
+/// Phase 19 — rekruting / tasdiq pipeline
+enum DriverOnboardingStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+/// Phase 20 — oyma-oy hisob varaq (pilot, qo‘lda tasdiq)
+enum DriverMonthSettlementStatus {
+  PENDING
+  CONFIRMED
+  WAIVED
+  /**
+   * Qo‘lda yechim / kredit o‘rniga qayd (provayder keyin)
+   */
+  CHARGED_MANUAL
+}
+
+// ——— Core identity ———
+
+model User {
+  id           String            @id @default(uuid()) @db.Uuid
+  phone        String            @unique
+  passwordHash String?
+  role         UserRole
+  status       UserAccountStatus @default(PENDING_VERIFICATION)
+  lastLoginAt  DateTime?         @db.Timestamptz(3)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+
+  driver   Driver?
+  operator Operator?
+  admin    Admin?
+
+  auditLogsAsActor    AuditLog[]           @relation("AuditActor")
+  tripEvents          TripEvent[]
+  notificationLogs    NotificationLog[]    @relation("NotifToUser")
+  supportTickets      SupportTicket[]
+  authRefreshSessions AuthRefreshSession[]
+}
+
+model AuthRefreshSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String    @db.Uuid
+  role      String
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, revokedAt])
+}
+
+model Admin {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  adminChatMessages DriverAdminChatMessage[]
+}
+
+model Operator {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @unique @db.Uuid
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceZoneId String?      @db.Uuid
+  serviceZone   ServiceZone? @relation("OperatorsInZone", fields: [serviceZoneId], references: [id], onDelete: SetNull)
+  displayName   String
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @db.Timestamptz(3)
+
+  ordersCreated              Order[]                     @relation("OrderCreatedBy")
+  zonesWithDefaultAsOperator ServiceZone[]               @relation("DefaultOperators")
+  chatMessages               DriverOperatorChatMessage[]
+}
+
+model ServiceZone {
+  id                     String    @id @default(uuid()) @db.Uuid
+  name                   String
+  slug                   String    @unique
+  centerLat              Decimal?  @db.Decimal(9, 6)
+  centerLng              Decimal?  @db.Decimal(9, 6)
+  /// Pickup zonalari bo‘yicha boshlang‘ich xizmat narxi (chaqiruv / bosqichli start)
+  starterFeeUzs          Decimal?  @db.Decimal(18, 2)
+  /// Birinchi necha daqiqa kutish tekin (default 10)
+  waitingFreeMinutes     Int?
+  /// Tekin tugagach har daqiqa narxi (so‘m)
+  waitingFeePerMinuteUzs Decimal?  @db.Decimal(18, 2)
+  /// METERED: GPS masofa qismi uchun — har km (starter alohida)
+  meterBaseUzs           Decimal?  @db.Decimal(18, 2)
+  meterPerKmUzs          Decimal?  @db.Decimal(18, 2)
+  isActive               Boolean   @default(true)
+  /// Default operator of record (optional)
+  defaultOperatorId      String?   @db.Uuid
+  defaultOperator        Operator? @relation("DefaultOperators", fields: [defaultOperatorId], references: [id], onDelete: SetNull)
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
+
+  drivers         Driver[]
+  operators       Operator[]           @relation("OperatorsInZone")
+  vehicles        Vehicle[]
+  orders          Order[]
+  subscriptions   DriverSubscription[]
+  pricingProfiles PricingProfile[]
+
+  @@index([isActive, slug])
+}
+
+model PricingProfile {
+  id               String      @id @default(uuid()) @db.Uuid
+  serviceZoneId    String      @db.Uuid
+  serviceZone      ServiceZone @relation(fields: [serviceZoneId], references: [id], onDelete: Cascade)
+  name             String
+  cityKmRateUzs    Decimal     @default(2500) @db.Decimal(18, 2)
+  outsideKmRateUzs Decimal     @default(3500) @db.Decimal(18, 2)
+  freeWaitMinutes  Int         @default(10)
+  waitPerMinuteUzs Decimal     @default(1000) @db.Decimal(18, 2)
+  isDefault        Boolean     @default(true)
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(3)
+
+  rings  PricingRing[]
+  orders Order[]
+
+  @@index([serviceZoneId, isDefault, isActive])
+}
+
+model PricingRing {
+  id               String         @id @default(uuid()) @db.Uuid
+  pricingProfileId String         @db.Uuid
+  pricingProfile   PricingProfile @relation(fields: [pricingProfileId], references: [id], onDelete: Cascade)
+  code             String         @db.VarChar(40)
+  name             String
+  radiusFromKm     Decimal        @default(0) @db.Decimal(8, 2)
+  radiusToKm       Decimal?       @db.Decimal(8, 2)
+  starterFeeUzs    Decimal        @db.Decimal(18, 2)
+  /// Null bo‘lsa profile city/outside rate ishlatiladi; berilsa shu ring rate snapshot qilinadi.
+  distanceRateUzs  Decimal?       @db.Decimal(18, 2)
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+
+  orders Order[]
+
+  @@unique([pricingProfileId, code])
+  @@index([pricingProfileId, sortOrder])
+}
+
+model Driver {
+  id                     String                      @id @default(uuid()) @db.Uuid
+  userId                 String                      @unique @db.Uuid
+  user                   User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceZoneId          String?                     @db.Uuid
+  serviceZone            ServiceZone?                @relation(fields: [serviceZoneId], references: [id], onDelete: SetNull)
+  operationalStatus      DriverOperationalStatus     @default(OFFLINE)
+  /// Qulay: balans (to‘g‘ri manba keyin ledger yig‘indisidan)
+  balanceUzs             Decimal                     @default(0) @db.Decimal(18, 2)
+  ratingAvg              Decimal?                    @db.Decimal(3, 2)
+  fcmToken               String?
+  /// Mobil ilova/client tomonidan yuborilgan qurilma identifikatori (FCM dan mustaqil)
+  clientDeviceId         String?
+  /// Bank / IBAN (payout) — haydovchi ilovasidan, admin bank CSV da qo‘llanadi
+  payoutIban             String?                     @db.VarChar(64)
+  payoutAccountName      String?                     @db.VarChar(200)
+  /// Phase 19 — ariza holati
+  onboardingStatus       DriverOnboardingStatus      @default(DRAFT)
+  firstName              String?                     @db.VarChar(120)
+  lastName               String?                     @db.VarChar(120)
+  passportOrId           String?                     @db.VarChar(64)
+  passportSeries         String?                     @db.VarChar(16)
+  passportNumber         String?                     @db.VarChar(32)
+  referralNote           String?                     @db.VarChar(200)
+  submittedAt            DateTime?                   @db.Timestamptz(3)
+  reviewedAt             DateTime?                   @db.Timestamptz(3)
+  rejectionReason        String?                     @db.Text
+  /// Admin tasdiqlaganda 12 xonali noyob kod (migratsiyada `null` = legacy, aktivatsiya sharti qo‘llanmaydi)
+  activationCode         String?                     @unique @db.VarChar(12)
+  activationCodeIssuedAt DateTime?                   @db.Timestamptz(3)
+  appActivatedAt         DateTime?                   @db.Timestamptz(3)
+  adminNotes             String?                     @db.Text
+  monthSettlements       DriverMonthSettlement[]
+  leaderboardOverrides   DriverLeaderboardOverride[]
+  lifetimeXpOverride       DriverLifetimeXpOverride?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  documents              DriverDocument[]
+  vehicles               Vehicle[]
+  orderAssignments       OrderAssignment[]
+  locationPings          LocationPing[]
+  trips                  Trip[]
+  ordersAssigned         Order[]                   @relation("OrderAssignedDriver")
+  earnings               EarningsLedger[]
+  subscriptions          DriverSubscription[]
+  bonusRewards           BonusReward[]
+  otpChallenges          OtpLoginChallenge[]
+  operatorChatThread     DriverOperatorChatThread?
+  adminChatThread        DriverAdminChatThread?
+  /// Operator kanalida haydovchi oxirgi marta o‘qigan vaqt (unread badge)
+  operatorChatLastReadAt DateTime?                 @db.Timestamptz(3)
+  /// Administrator kanalida haydovchi oxirgi marta o‘qigan vaqt
+  adminChatLastReadAt    DateTime?                 @db.Timestamptz(3)
+  adminNewsReads         AdminNewsDriverRead[]
+
+  @@index([operationalStatus, serviceZoneId])
+}
+
+/// Bitta thread / haydovchi (barcha operatorlar umumiy yozishma)
+model DriverOperatorChatThread {
+  id            String                      @id @default(uuid()) @db.Uuid
+  driverId      String                      @unique @db.Uuid
+  driver        Driver                      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime?                   @db.Timestamptz(3)
+  createdAt     DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                    @updatedAt @db.Timestamptz(3)
+  messages      DriverOperatorChatMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model DriverOperatorChatMessage {
+  id         String                   @id @default(uuid()) @db.Uuid
+  threadId   String                   @db.Uuid
+  thread     DriverOperatorChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender     ChatMessageSender
+  operatorId String?                  @db.Uuid
+  operator   Operator?                @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  body       String                   @db.Text
+  createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+
+  @@index([threadId, createdAt])
+}
+
+/// Administrator ↔ haydovchi alohida thread (operator threadidan mustaqil)
+model DriverAdminChatThread {
+  id            String                   @id @default(uuid()) @db.Uuid
+  driverId      String                   @unique @db.Uuid
+  driver        Driver                   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime?                @db.Timestamptz(3)
+  createdAt     DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                 @updatedAt @db.Timestamptz(3)
+  messages      DriverAdminChatMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model DriverAdminChatMessage {
+  id        String                @id @default(uuid()) @db.Uuid
+  threadId  String                @db.Uuid
+  thread    DriverAdminChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    ChatMessageSender
+  adminId   String?               @db.Uuid
+  admin     Admin?                @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  body      String                @db.Text
+  createdAt DateTime              @default(now()) @db.Timestamptz(3)
+
+  @@index([threadId, createdAt])
+}
+
+/// Phase 18: telefon orqali bir martalik SMS kod (pilot, driver)
+model OtpLoginChallenge {
+  id         String    @id @default(uuid()) @db.Uuid
+  phoneNorm  String
+  codeHash   String
+  driverId   String    @db.Uuid
+  driver     Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+
+  @@index([phoneNorm, createdAt])
+  @@index([driverId, createdAt])
+}
+
+model Vehicle {
+  id              String       @id @default(uuid()) @db.Uuid
+  driverId        String       @db.Uuid
+  driver          Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  serviceZoneId   String?      @db.Uuid
+  serviceZone     ServiceZone? @relation(fields: [serviceZoneId], references: [id], onDelete: SetNull)
+  plate           String
+  /// Viloyat kodi (masalan 01, 10) — davlat raqami bilan birga
+  plateRegionCode String?      @db.VarChar(4)
+  makeModel       String
+  year            Int?
+  color           String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@index([driverId, isActive])
+}
+
+/// Yagona qator: platform komissiyasi va kelajakda boshqa global sozlamalar.
+model PlatformSettings {
+  id                                     String   @id @db.VarChar(32)
+  platformCommissionBps                  Int      @default(1000)
+  /// Yangi buyurtma broadcast: komissiya hamyoni kamida shuncha bo‘lmasa haydovchi tanlanmaydi.
+  commissionWalletMinBroadcastBalanceUzs Int      @default(10000)
+  /// «Kam qoldi» ogohlantirish (pastki chegara), min dan yuqori bo‘lishi kerak.
+  commissionWalletLowBalanceUzs          Int      @default(30000)
+  /// Haydovchi ilovasi «Chempionlar» sovrin kartochkasi (admin boshqaruvi).
+  championsSeasonTitleUz                 String?  @db.VarChar(200)
+  championsPrizeDescriptionUz            String?  @db.Text
+  championsCadenceHintUz                 String?  @db.VarChar(800)
+  championsPrizeUsd                      Int      @default(100)
+  /// `{{DATE}}` yoki `{date}` → chorak oxiri sanasi (YYYY-MM-DD).
+  championsPeriodEndTemplateUz           String?  @db.VarChar(800)
+  /// Test / admin: oylik leaderboard davrini qo‘lda boshlab tugatish (UTC). `YYYY-MM` format.
+  championsPeriodYmOverride              String?  @db.VarChar(7)
+  /// Haydovchi ilovasi: XP tier ekranida ko‘rsatiladigan bonus (so‘m) — admin o‘zgartiradi.
+  driverXpBonusUzs                     Int      @default(0)
+  /// Har bir tier (`STARTER`, `BRONZE`, …) uchun bonus (so‘m). Bo‘sh bo‘lsa `driverXpBonusUzs` barcha tierga qo‘llanadi.
+  driverXpTierBonusesUzsJson           Json?
+  updatedAt                              DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// Admin: haydovchi umumiy XP ni override qilish (real hisobdan keyingi o‘sishlar qo‘shiladi).
+model DriverLifetimeXpOverride {
+  id               String   @id @default(uuid()) @db.Uuid
+  driverId         String   @unique @db.Uuid
+  driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  xp               Int
+  baseComputedXp   Int      @default(0)
+  updatedByUserId String?  @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model DriverDocument {
+  id         String               @id @default(uuid()) @db.Uuid
+  driverId   String               @db.Uuid
+  driver     Driver               @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type       DriverDocumentType
+  status     DriverDocumentStatus @default(PENDING)
+  storageKey String
+  /// Signed URL muddati; hujjatning amal qilish muddati
+  validUntil DateTime?            @db.Timestamptz(3)
+  createdAt  DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime             @updatedAt @db.Timestamptz(3)
+
+  @@index([driverId, type])
+}
+
+// ——— Subscriptions (Phase 9 business rules; jadval Phase 2) ———
+
+model SubscriptionPackage {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  /// Dispatch score: ustunlik (masalan: 0 bo‘lmasa)
+  priorityWeight Decimal  @default(0) @db.Decimal(5, 2)
+  priceUzs       Decimal  @db.Decimal(18, 2)
+  durationDays   Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  subscriptions DriverSubscription[]
+}
+
+model DriverSubscription {
+  id            String                   @id @default(uuid()) @db.Uuid
+  driverId      String                   @db.Uuid
+  driver        Driver                   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  packageId     String                   @db.Uuid
+  package       SubscriptionPackage      @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  serviceZoneId String?                  @db.Uuid
+  serviceZone   ServiceZone?             @relation(fields: [serviceZoneId], references: [id], onDelete: SetNull)
+  status        DriverSubscriptionStatus @default(PENDING)
+  startAt       DateTime                 @db.Timestamptz(3)
+  endAt         DateTime                 @db.Timestamptz(3)
+  createdAt     DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                 @updatedAt @db.Timestamptz(3)
+
+  @@index([driverId, status, endAt])
+  @@index([endAt, status])
+}
+
+// ——— Bonuses (Phase 9) ———
+
+model BonusCampaign {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  /// JSON: qoidalar, top-driver, count challenge, etc.
+  rules     Json
+  startAt   DateTime @db.Timestamptz(3)
+  endAt     DateTime @db.Timestamptz(3)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  rewards BonusReward[]
+
+  @@index([isActive, startAt, endAt])
+}
+
+model BonusReward {
+  id         String        @id @default(uuid()) @db.Uuid
+  campaignId String        @db.Uuid
+  campaign   BonusCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  driverId   String        @db.Uuid
+  driver     Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  amountUzs  Decimal       @db.Decimal(18, 2)
+  /// pending / yechilgan
+  isPaid     Boolean       @default(false)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@index([driverId, campaignId])
+}
+
+// ——— Orders & Trips ———
+
+model CancellationReason {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  labelUz   String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  orders    Order[]
+}
+
+model Order {
+  id                         String          @id @default(uuid()) @db.Uuid
+  serviceZoneId              String?         @db.Uuid
+  serviceZone                ServiceZone?    @relation(fields: [serviceZoneId], references: [id], onDelete: SetNull)
+  pricingProfileId           String?         @db.Uuid
+  pricingProfile             PricingProfile? @relation(fields: [pricingProfileId], references: [id], onDelete: SetNull)
+  pricingRingId              String?         @db.Uuid
+  pricingRing                PricingRing?    @relation(fields: [pricingRingId], references: [id], onDelete: SetNull)
+  status                     OrderStatus     @default(CREATED)
+  customerPhone              String
+  pickupLandmark             String
+  /// Ixtiyoriy: kelish yaqinligi tekshiruvi uchun (GPS)
+  pickupLat                  Decimal?        @db.Decimal(9, 6)
+  pickupLng                  Decimal?        @db.Decimal(9, 6)
+  dropoffText                String?
+  notes                      String?
+  paymentType                PaymentType     @default(CASH)
+  fareMode                   FareMode        @default(OPERATOR_ENTERED)
+  /// Operator kirita oladigan narx (Phase 7 bilan birga)
+  operatorEnteredFareUzs     Decimal?        @db.Decimal(18, 2)
+  pickupPricingZoneName      String?
+  pickupDistanceFromCenterKm Decimal?        @db.Decimal(10, 2)
+  starterFeeUzs              Decimal?        @db.Decimal(18, 2)
+  distanceRateUzs            Decimal?        @db.Decimal(18, 2)
+  freeWaitMinutes            Int?
+  waitingFeePerMinuteUzs     Decimal?        @db.Decimal(18, 2)
+  pricingOverridden          Boolean         @default(false)
+  pricingOverrideReason      String?         @db.Text
+
+  createdByOperatorId  String?             @db.Uuid
+  createdBy            Operator?           @relation("OrderCreatedBy", fields: [createdByOperatorId], references: [id], onDelete: SetNull)
+  assignedDriverId     String?             @db.Uuid
+  assignedDriver       Driver?             @relation("OrderAssignedDriver", fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  cancellationReasonId String?             @db.Uuid
+  cancellationReason   CancellationReason? @relation(fields: [cancellationReasonId], references: [id], onDelete: SetNull)
+  cancelNote           String?
+
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  broadcastedAt DateTime? @db.Timestamptz(3)
+  acceptedAt    DateTime? @db.Timestamptz(3)
+  expiredAt     DateTime? @db.Timestamptz(3)
+
+  assignments      OrderAssignment[]
+  trip             Trip?
+  commission       CommissionLedger[]
+  earnings         EarningsLedger[]
+  notificationLogs NotificationLog[]
+  smsLogs          SMSLog[]
+  locationPings    LocationPing[]
+
+  @@index([status, serviceZoneId, createdAt])
+  @@index([customerPhone, createdAt])
+}
+
+model OrderAssignment {
+  id         String                @id @default(uuid()) @db.Uuid
+  orderId    String                @db.Uuid
+  order      Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId   String                @db.Uuid
+  driver     Driver                @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  status     OrderAssignmentStatus @default(PENDING)
+  round      Int                   @default(0)
+  offeredAt  DateTime              @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime              @db.Timestamptz(3)
+  decidedAt  DateTime?             @db.Timestamptz(3)
+  rejectNote String?
+  /// Bir vaqtda bitta PENDING: application-level check (unique partial index - keyingi migratsiya)
+  createdAt  DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([orderId, status, offeredAt])
+  @@index([driverId, status, offeredAt])
+}
+
+/// Transport lifecycle — Order’dan bitta; Order bilan 1:1
+model Trip {
+  id                     String     @id @default(uuid()) @db.Uuid
+  orderId                String     @unique @db.Uuid
+  order                  Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId               String     @db.Uuid
+  driver                 Driver     @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  status                 TripStatus @default(NOT_STARTED)
+  startedAt              DateTime?  @db.Timestamptz(3)
+  endedAt                DateTime?  @db.Timestamptz(3)
+  grossUzs               Decimal?   @db.Decimal(18, 2)
+  commissionUzs          Decimal?   @db.Decimal(18, 2)
+  netUzs                 Decimal?   @db.Decimal(18, 2)
+  disputeNote            String?
+  /// Kutish narxi uchun: haydovchi «Mo‘ljalga keldim» vaqti
+  waitingStartedAt       DateTime?  @db.Timestamptz(3)
+  waitingEndedAt         DateTime?  @db.Timestamptz(3)
+  freeWaitMinutes        Int?
+  paidWaitMinutes        Int?
+  /// Order yaratilish zonalidagi snapshot — acceptda yoziladi.
+  starterFeeUzs          Decimal?   @db.Decimal(18, 2)
+  waitingFeePerMinuteUzs Decimal?   @db.Decimal(18, 2)
+  waitingFeeUzs          Decimal?   @db.Decimal(18, 2)
+  /// Safar («yo‘lda» / qo‘lda / km) narxi komponenti — starter va kutishdan tashqari
+  manualFareUzs          Decimal?   @db.Decimal(18, 2)
+  distanceMeters         Decimal?   @db.Decimal(12, 2)
+  distanceRateUzs        Decimal?   @db.Decimal(18, 2)
+  distanceFeeUzs         Decimal?   @db.Decimal(18, 2)
+  /// starter + kutish + safar narxi bo‘linmasi yakuni
+  finalFareUzs           Decimal?   @db.Decimal(18, 2)
+  pricingPlanId          String?    @db.VarChar(64)
+  createdAt              DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime   @updatedAt @db.Timestamptz(3)
+
+  events         TripEvent[]
+  locationPings  LocationPing[]     @relation("PingTrip")
+  commissionRows CommissionLedger[]
+  earnings       EarningsLedger[]
+
+  @@index([driverId, status, startedAt])
+}
+
+model TripEvent {
+  id          String        @id @default(uuid()) @db.Uuid
+  tripId      String        @db.Uuid
+  trip        Trip          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type        TripEventType
+  payload     Json?
+  /// Kim yozdi (tizim yoki foydalanuvchi)
+  createdById String?       @db.Uuid
+  createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([tripId, createdAt])
+}
+
+// ——— Tracking ———
+
+model LocationPing {
+  id         String   @id @default(uuid()) @db.Uuid
+  driverId   String   @db.Uuid
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  orderId    String?  @db.Uuid
+  order      Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tripId     String?  @db.Uuid
+  trip       Trip?    @relation("PingTrip", fields: [tripId], references: [id], onDelete: SetNull)
+  lat        Decimal  @db.Decimal(9, 6)
+  lng        Decimal  @db.Decimal(9, 6)
+  accuracyM  Float?
+  speedKmh   Float?
+  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+  /// GPS / network / last_known
+  source     String?  @default("gps")
+  /// Raw payload or debug
+  metadata   Json?
+
+  @@index([driverId, recordedAt])
+  @@index([tripId, recordedAt])
+}
+
+/// Mijoz SMS matnlari (operatoriy; `{{o'zgaruvchi}}` almashtirish)
+model SmsTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  bodyUz    String   @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// ——— Ledger ———
+
+model EarningsLedger {
+  id              String             @id @default(uuid()) @db.Uuid
+  driverId        String             @db.Uuid
+  driver          Driver             @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type            EarningsLedgerType
+  amountUzs       Decimal            @db.Decimal(18, 2)
+  /// Balans shundan keyin (mijoz tizimida soddalash tavsiya, bu yerda saqlanadi)
+  balanceAfterUzs Decimal?           @db.Decimal(18, 2)
+  orderId         String?            @db.Uuid
+  order           Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tripId          String?            @db.Uuid
+  trip            Trip?              @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  note            String?
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@index([driverId, createdAt])
+  @@index([orderId, tripId])
+}
+
+model CommissionLedger {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String?  @db.Uuid
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tripId    String?  @db.Uuid
+  trip      Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  amountUzs Decimal  @db.Decimal(18, 2)
+  rateBps   Int?
+  /// foiz 10000 = 100.00% bo‘lmasin — bps
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  note      String?
+
+  @@index([orderId, tripId])
+}
+
+/// Phase 20 — oyning yakunida komissiya / tasdiq (qo‘llanmalar, avtomat emas)
+model DriverMonthSettlement {
+  id               String                      @id @default(uuid()) @db.Uuid
+  driverId         String                      @db.Uuid
+  driver           Driver                      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  /// `YYYY-MM` (UTC, masalan 2026-04)
+  periodYm         String                      @db.VarChar(7)
+  tripCount        Int
+  commissionDueUzs Decimal                     @db.Decimal(18, 2)
+  status           DriverMonthSettlementStatus @default(PENDING)
+  notes            String?                     @db.Text
+  confirmedAt      DateTime?                   @db.Timestamptz(3)
+  chargedAt        DateTime?                   @db.Timestamptz(3)
+  createdAt        DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                    @updatedAt @db.Timestamptz(3)
+
+  @@unique([driverId, periodYm])
+  @@index([periodYm, status])
+}
+
+/// Admin override: oylik leaderboard ball/safar (manual test va korreksiya uchun).
+model DriverLeaderboardOverride {
+  id              String   @id @default(uuid()) @db.Uuid
+  driverId        String   @db.Uuid
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  /// `YYYY-MM` (UTC, masalan 2026-04)
+  periodYm        String   @db.VarChar(7)
+  /// Admin kiritgan ball (o‘sha oy uchun).
+  score           Int
+  /// Score’dan kelib chiqqan safar soni (UI/leaderboard uchun).
+  trips           Int
+  /// Override qo‘yilgan paytdagi real stat snapshot (keyingi safarlar/cancel'lar qo'shilishi uchun).
+  baseTrips       Int?     @default(0)
+  baseCancels     Int?     @default(0)
+  /// Audit: kim o‘zgartirdi (User.id).
+  updatedByUserId String?  @db.Uuid
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([driverId, periodYm])
+  @@index([periodYm])
+}
+
+// ——— Notifications & SMS ———
+
+model NotificationLog {
+  id        String                     @id @default(uuid()) @db.Uuid
+  userId    String?                    @db.Uuid
+  user      User?                      @relation("NotifToUser", fields: [userId], references: [id], onDelete: SetNull)
+  orderId   String?                    @db.Uuid
+  order     Order?                     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  channel   NotificationChannel
+  template  String
+  body      String?
+  status    NotificationDeliveryStatus @default(QUEUED)
+  error     String?
+  createdAt DateTime                   @default(now()) @db.Timestamptz(3)
+  sentAt    DateTime?                  @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@index([orderId, createdAt])
+}
+
+/// Administrator yuborgan yangiliklar — mobil «Yangiliklar» ro‘yxati (popupdan tashqari).
+model AdminNewsBroadcast {
+  id             String                @id @default(uuid()) @db.Uuid
+  title          String                @db.VarChar(200)
+  body           String                @db.Text
+  /// `all_approved` | `zone` | `single_driver`
+  audience       String                @db.VarChar(32)
+  serviceZoneId  String?               @db.Uuid
+  targetDriverId String?               @db.Uuid
+  targetedCount  Int                   @default(0)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  reads          AdminNewsDriverRead[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+/// Haydovchi administrator yangiliklarini o‘qiganini belgilash (badge).
+model AdminNewsDriverRead {
+  id          String   @id @default(uuid()) @db.Uuid
+  driverId    String   @db.Uuid
+  broadcastId String   @db.Uuid
+  readAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  driver    Driver             @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  broadcast AdminNewsBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, broadcastId])
+  @@index([driverId])
+}
+
+model SMSLog {
+  id         String            @id @default(uuid()) @db.Uuid
+  orderId    String?           @db.Uuid
+  order      Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  toPhone    String
+  body       String
+  status     SmsDeliveryStatus @default(QUEUED)
+  error      String?
+  providerId String?
+  createdAt  DateTime          @default(now()) @db.Timestamptz(3)
+  sentAt     DateTime?         @db.Timestamptz(3)
+
+  @@index([orderId, createdAt])
+}
+
+model SupportTicket {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String?             @db.Uuid
+  user      User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subject   String
+  body      String
+  status    SupportTicketStatus @default(OPEN)
+  createdAt DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(3)
+}
+
+/// Barcha muhim operatsion o‘zgarishlar: cancel, reassign, settings
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  action     String
+  entityType String
+  entityId   String?  @db.Uuid
+  metadata   Json?
+  actorId    String?  @db.Uuid
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
