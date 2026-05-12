@@ -1,11 +1,11 @@
-import * as path from 'node:path';
+import { championsBannersUploadRoot } from '../config/local-upload-paths';
 
 /** UUID v4 + ruxsat etilgan kengaytmalar (admin yuklash / public serve). */
 export const CHAMPIONS_BANNER_FILE_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|jpeg|webp)$/i;
 
 export function championsBannerUploadDir(): string {
-  return path.resolve(process.env.CHAMPIONS_BANNER_UPLOAD_DIR || path.join(process.cwd(), 'var', 'champions-banners'));
+  return championsBannersUploadRoot();
 }
 
 export function contentTypeForBannerExt(ext: string): string {

@@ -15,6 +15,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { driverDocumentsUploadRoot } from "../config/local-upload-paths";
 import { AddDriverDocumentDto } from "./dto/add-driver-document.dto";
 import { PatchDriverOnboardingDto } from "./dto/patch-onboarding.dto";
 
@@ -219,9 +220,7 @@ export class OnboardingService {
     const safeExt =
       extRaw.length <= 8 && extRaw.startsWith(".") ? extRaw : ".jpg";
     const key = `driver-docs/${driverId}/${randomUUID()}${safeExt}`;
-    const root =
-      process.env.DRIVER_DOC_UPLOAD_DIR ||
-      path.join(process.cwd(), "var", "driver-uploads");
+    const root = driverDocumentsUploadRoot();
     const full = path.join(root, key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, file.buffer);
@@ -253,9 +252,7 @@ export class OnboardingService {
     const safeExt =
       extRaw.length <= 8 && extRaw.startsWith(".") ? extRaw : ".jpg";
     const key = `driver-docs/${driverId}/${randomUUID()}${safeExt}`;
-    const root =
-      process.env.DRIVER_DOC_UPLOAD_DIR ||
-      path.join(process.cwd(), "var", "driver-uploads");
+    const root = driverDocumentsUploadRoot();
     const full = path.join(root, key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, file.buffer);
@@ -278,10 +275,7 @@ export class OnboardingService {
     if (!doc) {
       throw new NotFoundException();
     }
-    const root = path.resolve(
-      process.env.DRIVER_DOC_UPLOAD_DIR ||
-        path.join(process.cwd(), "var", "driver-uploads"),
-    );
+    const root = driverDocumentsUploadRoot();
     const rel = doc.storageKey.replace(/^[\\/]+/, "");
     const full = path.resolve(path.join(root, rel));
     const relative = path.relative(root, full);

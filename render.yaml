@@ -1,0 +1,25 @@
+# Render Blueprint namunasi: persistent disk + bitta mount ostida barcha yuklamalar.
+# Dashboard: New → Blueprint → bu faylni ulang, yoki mavjud Web Service → Environment / Disks ni qo‘lda moslang.
+#
+# Muhim: `disk.mountPath` va `SALOM_UPLOAD_ROOT` bir xil bo‘lishi kerak.
+# Disk qo‘shilgach, avvalgi deploydagi ephemeral fayllar qaytmaydi — haydovchilar hujjatni qayta yuklashi mumkin.
+
+services:
+  - type: web
+    name: salom-api
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:render
+    healthCheckPath: /api/v1/health
+    disk:
+      name: salom-uploads
+      mountPath: /var/salom-data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SALOM_UPLOAD_ROOT
+        value: /var/salom-data
+      # DATABASE_URL, REDIS_URL va boshqalarni Dashboard’da Secret sifatida qo‘shing.
