@@ -4,8 +4,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   DriverOperationalStatus,
   FareMode,
@@ -13,18 +13,18 @@ import {
   Prisma,
   TripEventType,
   TripStatus,
-} from '@prisma/client';
-import { distanceMetersHaversine } from '../common/haversine';
-import { LedgerService } from '../ledger/ledger.service';
-import { OrderLifecycleService } from '../orders/order-lifecycle.service';
-import { OperationalNotificationsService } from '../notifications/operational-notifications.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { OperatorGateway } from '../tracking/operator.gateway';
-import { OpenDisputeDto } from '../orders/dto/open-dispute.dto';
-import { ResolveDisputeDto } from '../orders/dto/resolve-dispute.dto';
-import { CompleteTripDto } from './dto/complete-trip.dto';
-import { FareMeterService } from './fare-meter.service';
-import type { MeterConfigSnapshot } from './fare-meter.service';
+} from "@prisma/client";
+import { distanceMetersHaversine } from "../common/haversine";
+import { LedgerService } from "../ledger/ledger.service";
+import { OrderLifecycleService } from "../orders/order-lifecycle.service";
+import { OperationalNotificationsService } from "../notifications/operational-notifications.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { OperatorGateway } from "../tracking/operator.gateway";
+import { OpenDisputeDto } from "../orders/dto/open-dispute.dto";
+import { ResolveDisputeDto } from "../orders/dto/resolve-dispute.dto";
+import { CompleteTripDto } from "./dto/complete-trip.dto";
+import { FareMeterService } from "./fare-meter.service";
+import type { MeterConfigSnapshot } from "./fare-meter.service";
 
 @Injectable()
 export class TripsService {
@@ -42,7 +42,9 @@ export class TripsService {
     const trip = await this.prisma.trip.findFirst({
       where: {
         driverId,
-        status: { in: [TripStatus.NOT_STARTED, TripStatus.ACTIVE, TripStatus.DISPUTED] },
+        status: {
+          in: [TripStatus.NOT_STARTED, TripStatus.ACTIVE, TripStatus.DISPUTED],
+        },
         order: {
           status: {
             notIn: [
@@ -55,13 +57,13 @@ export class TripsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         order: { include: { serviceZone: true } },
       },
     });
     if (!trip) {
-      return { activeTrip: null as null };
+      return { activeTrip: null };
     }
     const fareMode = trip.order.fareMode;
     const starter = this.snapshotStarterUzs(trip);
@@ -82,7 +84,9 @@ export class TripsService {
         trip.id,
         perKm != null ? Number(perKm) : undefined,
       );
-      const estimatedTotal = Math.round(starter + waitingCommitted + d.distanceFeeUzs);
+      const estimatedTotal = Math.round(
+        starter + waitingCommitted + d.distanceFeeUzs,
+      );
       metered = {
         billableMeters: d.billableMeters,
         estimatedFareUzs: estimatedTotal,
@@ -93,7 +97,10 @@ export class TripsService {
       };
     }
 
-    if (fareMode === FareMode.METERED && trip.status === TripStatus.NOT_STARTED) {
+    if (
+      fareMode === FareMode.METERED &&
+      trip.status === TripStatus.NOT_STARTED
+    ) {
       const perKm =
         trip.distanceRateUzs != null
           ? Number(trip.distanceRateUzs)
@@ -101,7 +108,11 @@ export class TripsService {
             ? Number(trip.order.distanceRateUzs)
             : await this.fareMeter.effectivePerKmUzs(trip.order.serviceZoneId);
       let waitingEst = 0;
-      if (trip.order.status === OrderStatus.DRIVER_ARRIVING && trip.waitingStartedAt && trip.freeWaitMinutes != null) {
+      if (
+        trip.order.status === OrderStatus.DRIVER_ARRIVING &&
+        trip.waitingStartedAt &&
+        trip.freeWaitMinutes != null
+      ) {
         waitingEst = this.estimateWaitingFeeSoFar({
           waitingStartedAt: trip.waitingStartedAt,
           now: new Date(),
@@ -126,7 +137,11 @@ export class TripsService {
       accumulatedWaitingFeeEstimatedUzs: number;
       freeEndsAtEstimated?: string | null;
     } | null = null;
-    if (trip.order.status === OrderStatus.DRIVER_ARRIVING && trip.waitingStartedAt && trip.freeWaitMinutes != null) {
+    if (
+      trip.order.status === OrderStatus.DRIVER_ARRIVING &&
+      trip.waitingStartedAt &&
+      trip.freeWaitMinutes != null
+    ) {
       const rate = Number(trip.waitingFeePerMinuteUzs ?? 1000);
       const acc = this.estimateWaitingFeeSoFar({
         waitingStartedAt: trip.waitingStartedAt,
@@ -147,7 +162,9 @@ export class TripsService {
 
     let meterSnap: MeterConfigSnapshot | null = null;
     if (fareMode === FareMode.METERED) {
-      meterSnap = await this.fareMeter.configSnapshotForServiceZoneId(trip.order.serviceZoneId);
+      meterSnap = await this.fareMeter.configSnapshotForServiceZoneId(
+        trip.order.serviceZoneId,
+      );
     }
 
     return {
@@ -162,7 +179,8 @@ export class TripsService {
           customerPhone: trip.order.customerPhone,
           pickupLandmark: trip.order.pickupLandmark,
           dropoffText: trip.order.dropoffText,
-          operatorEnteredFareUzs: trip.order.operatorEnteredFareUzs?.toString() ?? null,
+          operatorEnteredFareUzs:
+            trip.order.operatorEnteredFareUzs?.toString() ?? null,
         },
         startedAt: trip.startedAt?.toISOString() ?? null,
         endedAt: trip.endedAt?.toISOString() ?? null,
@@ -180,7 +198,10 @@ export class TripsService {
   private snapshotStarterUzs(trip: {
     starterFeeUzs: Prisma.Decimal | null | undefined;
     order: {
-      serviceZone?: { starterFeeUzs: Prisma.Decimal | null; meterBaseUzs: Prisma.Decimal | null } | null;
+      serviceZone?: {
+        starterFeeUzs: Prisma.Decimal | null;
+        meterBaseUzs: Prisma.Decimal | null;
+      } | null;
     };
   }): number {
     if (trip.starterFeeUzs != null) {
@@ -189,7 +210,7 @@ export class TripsService {
     const z = trip.order.serviceZone;
     if (z?.starterFeeUzs != null) return Number(z.starterFeeUzs);
     if (z?.meterBaseUzs != null) return Number(z.meterBaseUzs);
-    return this.config.get<number>('METER_BASE_FARE_UZS', 5000);
+    return this.config.get<number>("METER_BASE_FARE_UZS", 5000);
   }
 
   private estimateWaitingFeeSoFar(opts: {
@@ -217,7 +238,7 @@ export class TripsService {
         },
       },
     });
-    if (!t) throw new NotFoundException('Trip not found');
+    if (!t) throw new NotFoundException("Trip not found");
     if (t.driverId !== driverId) {
       throw new ForbiddenException();
     }
@@ -233,13 +254,15 @@ export class TripsService {
     if (pickupLat == null || pickupLng == null) {
       return;
     }
-    const radius = this.config.get<number>('PICKUP_NEARBY_RADIUS_M', 180);
+    const radius = this.config.get<number>("PICKUP_NEARBY_RADIUS_M", 180);
     const ping = await this.prisma.locationPing.findFirst({
       where: { driverId, orderId },
-      orderBy: { recordedAt: 'desc' },
+      orderBy: { recordedAt: "desc" },
     });
     if (!ping) {
-      throw new BadRequestException("Joylashuv aniqlanmadi. GPS yoqilganini tekshirib, qayta urinib ko‘ring.");
+      throw new BadRequestException(
+        "Joylashuv aniqlanmadi. GPS yoqilganini tekshirib, qayta urinib ko‘ring.",
+      );
     }
     const dist = distanceMetersHaversine(
       Number(ping.lat),
@@ -258,22 +281,29 @@ export class TripsService {
   async markPickupArrived(tripId: string, driverId: string) {
     const t = await this.mustOwnTrip(tripId, driverId);
     if (t.status === TripStatus.DISPUTED) {
-      throw new ConflictException('Trip is DISPUTED');
+      throw new ConflictException("Trip is DISPUTED");
     }
     if (t.status !== TripStatus.NOT_STARTED) {
-      throw new ConflictException('Trip is not in NOT_STARTED');
+      throw new ConflictException("Trip is not in NOT_STARTED");
     }
     if (t.order.status !== OrderStatus.ACCEPTED) {
-      throw new ConflictException(`Order must be ACCEPTED, got ${t.order.status}`);
+      throw new ConflictException(
+        `Order must be ACCEPTED, got ${t.order.status}`,
+      );
     }
-    await this.assertNearPickupIfCoords(driverId, t.order.id, t.order.pickupLat, t.order.pickupLng);
+    await this.assertNearPickupIfCoords(
+      driverId,
+      t.order.id,
+      t.order.pickupLat,
+      t.order.pickupLng,
+    );
     const now = new Date();
     await this.prisma.$transaction([
       this.prisma.tripEvent.create({
         data: {
           tripId,
           type: TripEventType.DRIVER_ARRIVED_AT_PICKUP,
-          payload: { at: now.toISOString() } as object,
+          payload: { at: now.toISOString() },
         },
       }),
       this.prisma.trip.update({
@@ -289,25 +319,37 @@ export class TripsService {
         data: { operationalStatus: DriverOperationalStatus.ARRIVED_PICKUP },
       }),
     ]);
-    this.emit(t.order.serviceZoneId, { type: 'pickup_arrived', orderId: t.orderId, tripId, driverId });
-    return { ok: true as const, order: await this.prisma.order.findUnique({ where: { id: t.orderId } }) };
+    this.emit(t.order.serviceZoneId, {
+      type: "pickup_arrived",
+      orderId: t.orderId,
+      tripId,
+      driverId,
+    });
+    return {
+      ok: true as const,
+      order: await this.prisma.order.findUnique({ where: { id: t.orderId } }),
+    };
   }
 
   /** Safar boshlash: kutish narxi hisoblanadi; Trip ACTIVE. */
   async startTrip(tripId: string, driverId: string) {
     const t = await this.mustOwnTrip(tripId, driverId);
     if (t.status === TripStatus.DISPUTED) {
-      throw new ConflictException('Trip is DISPUTED');
+      throw new ConflictException("Trip is DISPUTED");
     }
     if (t.status !== TripStatus.NOT_STARTED) {
-      throw new ConflictException('Trip is not in NOT_STARTED');
+      throw new ConflictException("Trip is not in NOT_STARTED");
     }
     if (t.order.status !== OrderStatus.DRIVER_ARRIVING) {
-      throw new ConflictException(`Order must be DRIVER_ARRIVING, got ${t.order.status}`);
+      throw new ConflictException(
+        `Order must be DRIVER_ARRIVING, got ${t.order.status}`,
+      );
     }
     const now = new Date();
     if (!t.waitingStartedAt) {
-      throw new ConflictException('Kutish boshlanmagan: avval «Mo‘ljalga keldim»');
+      throw new ConflictException(
+        "Kutish boshlanmagan: avval «Mo‘ljalga keldim»",
+      );
     }
     const freeM = t.freeWaitMinutes ?? 10;
     const rate = Number(t.waitingFeePerMinuteUzs ?? 1000);
@@ -340,28 +382,35 @@ export class TripsService {
         data: {
           tripId,
           type: TripEventType.PASSENGER_ONBOARD,
-          payload: { at: now.toISOString() } as object,
+          payload: { at: now.toISOString() },
         },
       }),
       this.prisma.tripEvent.create({
         data: {
           tripId,
           type: TripEventType.TRIP_STARTED,
-          payload: { at: now.toISOString() } as object,
+          payload: { at: now.toISOString() },
         },
       }),
     ]);
-    this.emit(t.order.serviceZoneId, { type: 'trip_started', orderId: t.orderId, tripId, driverId });
+    this.emit(t.order.serviceZoneId, {
+      type: "trip_started",
+      orderId: t.orderId,
+      tripId,
+      driverId,
+    });
     return { ok: true as const };
   }
 
   async openDispute(tripId: string, driverId: string, body: OpenDisputeDto) {
     const t = await this.mustOwnTrip(tripId, driverId);
     if (t.status === TripStatus.DISPUTED) {
-      throw new ConflictException('Dispute already open');
+      throw new ConflictException("Dispute already open");
     }
     if (t.status !== TripStatus.NOT_STARTED && t.status !== TripStatus.ACTIVE) {
-      throw new ConflictException('Trip must be NOT_STARTED or ACTIVE to open dispute');
+      throw new ConflictException(
+        "Trip must be NOT_STARTED or ACTIVE to open dispute",
+      );
     }
     const now = new Date();
     await this.prisma.$transaction([
@@ -373,36 +422,55 @@ export class TripsService {
         data: {
           tripId,
           type: TripEventType.DISPUTE_OPENED,
-          payload: { at: now.toISOString(), note: body.note } as object,
+          payload: { at: now.toISOString(), note: body.note },
         },
       }),
     ]);
     this.emit(t.order.serviceZoneId, {
-      type: 'dispute_opened',
+      type: "dispute_opened",
       orderId: t.orderId,
       tripId,
       driverId,
       note: body.note,
     });
-    return { ok: true as const, trip: await this.prisma.trip.findUnique({ where: { id: tripId } }) };
+    return {
+      ok: true as const,
+      trip: await this.prisma.trip.findUnique({ where: { id: tripId } }),
+    };
   }
 
-  async resolveDispute(tripId: string, operatorId: string, body: ResolveDisputeDto) {
-    const t = await this.prisma.trip.findUnique({ where: { id: tripId }, include: { order: true } });
+  async resolveDispute(
+    tripId: string,
+    operatorId: string,
+    body: ResolveDisputeDto,
+  ) {
+    const t = await this.prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { order: true },
+    });
     if (!t) {
-      throw new NotFoundException('Trip not found');
+      throw new NotFoundException("Trip not found");
     }
     if (t.status !== TripStatus.DISPUTED) {
-      throw new ConflictException('Trip is not DISPUTED');
+      throw new ConflictException("Trip is not DISPUTED");
     }
-    if (body.outcome === 'cancel') {
-      return this.orderLifecycle.cancelByOperator(t.orderId, operatorId, { cancelNote: 'dispute_resolved_cancel' });
+    if (body.outcome === "cancel") {
+      return this.orderLifecycle.cancelByOperator(t.orderId, operatorId, {
+        cancelNote: "dispute_resolved_cancel",
+      });
     }
     if (t.order.status !== OrderStatus.PASSENGER_ONBOARD) {
-      throw new BadRequestException('Complete-from-dispute only when passenger was onboard (PASSENGER_ONBOARD)');
+      throw new BadRequestException(
+        "Complete-from-dispute only when passenger was onboard (PASSENGER_ONBOARD)",
+      );
     }
     const rawFare = body.fareUzs ?? 0;
-    return this.completeTrip(t.id, t.driverId, { fareUzs: rawFare }, { asOperatorFromDispute: true });
+    return this.completeTrip(
+      t.id,
+      t.driverId,
+      { fareUzs: rawFare },
+      { asOperatorFromDispute: true },
+    );
   }
 
   async completeTrip(
@@ -413,7 +481,9 @@ export class TripsService {
   ) {
     const t = await this.mustOwnTrip(tripId, driverId);
     if (t.status === TripStatus.DISPUTED && !opts?.asOperatorFromDispute) {
-      throw new ConflictException('Dispute is open: complete only via operator resolution');
+      throw new ConflictException(
+        "Dispute is open: complete only via operator resolution",
+      );
     }
     const isActive = t.status === TripStatus.ACTIVE;
     const isOperatorCloseDispute =
@@ -422,16 +492,22 @@ export class TripsService {
       Boolean(opts?.asOperatorFromDispute);
     if (!isActive && !isOperatorCloseDispute) {
       if (t.status === TripStatus.DISPUTED) {
-        throw new ConflictException('Dispute: cannot complete this trip state from driver app');
+        throw new ConflictException(
+          "Dispute: cannot complete this trip state from driver app",
+        );
       }
-      throw new ConflictException('Trip is not ACTIVE');
+      throw new ConflictException("Trip is not ACTIVE");
     }
     if (t.order.status !== OrderStatus.PASSENGER_ONBOARD) {
-      throw new ConflictException(`Order must be PASSENGER_ONBOARD, got ${t.order.status}`);
+      throw new ConflictException(
+        `Order must be PASSENGER_ONBOARD, got ${t.order.status}`,
+      );
     }
     const now = new Date();
-    const order = await this.prisma.order.findUnique({ where: { id: t.orderId } });
-    if (!order) throw new NotFoundException('Order');
+    const order = await this.prisma.order.findUnique({
+      where: { id: t.orderId },
+    });
+    if (!order) throw new NotFoundException("Order");
 
     const starter = Math.round(this.snapshotStarterUzs(t));
     const waiting = Math.round(Number(t.waitingFeeUzs ?? 0));
@@ -441,9 +517,9 @@ export class TripsService {
       const absolute = Math.round(body.fareUzs);
       const split = await this.ledger.splitGrossUzsIntAsync(absolute);
       const farePayload = {
-        starterFeeUzs: '(operator)',
-        waitingFeeUzs: '(operator)',
-        rideFareUzs: '(operator)',
+        starterFeeUzs: "(operator)",
+        waitingFeeUzs: "(operator)",
+        rideFareUzs: "(operator)",
         finalFareUzs: String(split.gross),
       };
       const out = await this.prisma.$transaction(async (tx) => {
@@ -458,7 +534,10 @@ export class TripsService {
             finalFareUzs: split.gross,
           },
         });
-        await tx.order.update({ where: { id: t.orderId }, data: { status: OrderStatus.COMPLETED } });
+        await tx.order.update({
+          where: { id: t.orderId },
+          data: { status: OrderStatus.COMPLETED },
+        });
         const wallet = await this.ledger.recordTripCompletion(tx, {
           driverId,
           orderId: t.orderId,
@@ -471,10 +550,10 @@ export class TripsService {
             type: TripEventType.TRIP_ENDED,
             payload: {
               at: now.toISOString(),
-              fareBreakdown: farePayload as object,
+              fareBreakdown: farePayload,
               disputeResolved: true,
               grossUzs: split.gross.toString(),
-            } as object,
+            },
           },
         });
         await tx.tripEvent.create({
@@ -485,13 +564,13 @@ export class TripsService {
               fareBreakdown: farePayload,
               disputeResolved: true,
               grossUzs: split.gross.toString(),
-            } as object,
+            },
           },
         });
         return { split, newBalance: wallet.newBalance };
       });
       this.emit(t.order.serviceZoneId ?? null, {
-        type: 'trip_completed',
+        type: "trip_completed",
         orderId: t.orderId,
         tripId,
         driverId,
@@ -521,7 +600,8 @@ export class TripsService {
     let distanceMeters: Prisma.Decimal | null = null;
     let distanceFeeUzs: Prisma.Decimal | null = null;
 
-    let rateForTrip: Prisma.Decimal | null = t.distanceRateUzs ?? order.distanceRateUzs ?? null;
+    let rateForTrip: Prisma.Decimal | null =
+      t.distanceRateUzs ?? order.distanceRateUzs ?? null;
 
     if (order.fareMode === FareMode.METERED) {
       const dist = await this.fareMeter.computeDistanceFareOnlyForTrip(
@@ -559,14 +639,22 @@ export class TripsService {
           grossUzs: split.gross,
           commissionUzs: split.commission,
           netUzs: split.net,
-          manualFareUzs: order.fareMode === FareMode.METERED ? null : new Prisma.Decimal(manualRide),
+          manualFareUzs:
+            order.fareMode === FareMode.METERED
+              ? null
+              : new Prisma.Decimal(manualRide),
           distanceMeters,
-          distanceRateUzs: order.fareMode === FareMode.METERED ? rateForTrip : null,
-          distanceFeeUzs: order.fareMode === FareMode.METERED ? distanceFeeUzs : null,
+          distanceRateUzs:
+            order.fareMode === FareMode.METERED ? rateForTrip : null,
+          distanceFeeUzs:
+            order.fareMode === FareMode.METERED ? distanceFeeUzs : null,
           finalFareUzs: split.gross,
         },
       });
-      await tx.order.update({ where: { id: t.orderId }, data: { status: OrderStatus.COMPLETED } });
+      await tx.order.update({
+        where: { id: t.orderId },
+        data: { status: OrderStatus.COMPLETED },
+      });
       const wallet = await this.ledger.recordTripCompletion(tx, {
         driverId,
         orderId: t.orderId,
@@ -579,11 +667,11 @@ export class TripsService {
           type: TripEventType.TRIP_ENDED,
           payload: {
             at: now.toISOString(),
-            fareBreakdown: farePayload as object,
+            fareBreakdown: farePayload,
             grossUzs: split.gross.toString(),
             commissionUzs: split.commission.toString(),
             netUzs: split.net.toString(),
-          } as object,
+          },
         },
       });
       await tx.tripEvent.create({
@@ -595,14 +683,14 @@ export class TripsService {
             grossUzs: split.gross.toString(),
             rateBps: split.rateBps,
             netUzs: split.net.toString(),
-          } as object,
+          },
         },
       });
       return { split, newBalance: wallet.newBalance };
     });
 
     this.emit(t.order.serviceZoneId, {
-      type: 'trip_completed',
+      type: "trip_completed",
       orderId: t.orderId,
       tripId,
       driverId,
@@ -639,7 +727,7 @@ export class TripsService {
     }
     const rows = await this.prisma.trip.findMany({
       where,
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
       take: 100,
       include: {
         order: {
@@ -670,10 +758,12 @@ export class TripsService {
     const n = Math.min(Math.max(take, 1), 50);
     const rows = await this.prisma.trip.findMany({
       where: { driverId, status: TripStatus.COMPLETED },
-      orderBy: { endedAt: 'desc' },
+      orderBy: { endedAt: "desc" },
       take: n,
       include: {
-        order: { select: { id: true, customerPhone: true, pickupLandmark: true } },
+        order: {
+          select: { id: true, customerPhone: true, pickupLandmark: true },
+        },
       },
     });
     return {

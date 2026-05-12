@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DriverOperationalStatus, EarningsLedgerType, Prisma, TripStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  DriverOperationalStatus,
+  EarningsLedgerType,
+  Prisma,
+  TripStatus,
+} from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 
 export type CommissionSplit = {
   gross: Prisma.Decimal;
@@ -33,7 +42,7 @@ export class LedgerService {
    */
   splitGrossUzsInt(grossUzs: number, rateBps?: number): CommissionSplit {
     const resolved =
-      rateBps ?? this.config.get<number>('PLATFORM_COMMISSION_BPS', 1000);
+      rateBps ?? this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
     const clampBps = Math.max(0, Math.min(10_000, resolved));
     const g = Math.max(0, Math.round(grossUzs));
     const commissionInt = Math.min(g, Math.round((g * clampBps) / 10_000));
@@ -47,9 +56,9 @@ export class LedgerService {
   }
 
   async resolveCommissionBps(): Promise<number> {
-    const envDefault = this.config.get<number>('PLATFORM_COMMISSION_BPS', 1000);
+    const envDefault = this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: { platformCommissionBps: true },
     });
     const raw = row?.platformCommissionBps ?? envDefault;
@@ -64,10 +73,16 @@ export class LedgerService {
     minBroadcastBalanceUzs: number;
     lowBalanceUzs: number;
   }> {
-    const envMin = this.config.get<number>('COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS', 10_000);
-    const envLow = this.config.get<number>('COMMISSION_WALLET_LOW_BALANCE_UZS', 30_000);
+    const envMin = this.config.get<number>(
+      "COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS",
+      10_000,
+    );
+    const envLow = this.config.get<number>(
+      "COMMISSION_WALLET_LOW_BALANCE_UZS",
+      30_000,
+    );
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: {
         commissionWalletMinBroadcastBalanceUzs: true,
         commissionWalletLowBalanceUzs: true,
@@ -86,7 +101,7 @@ export class LedgerService {
     return this.splitGrossUzsInt(grossUzs, bps);
   }
 
-  private amount(value: number, label = 'amountUzs'): Prisma.Decimal {
+  private amount(value: number, label = "amountUzs"): Prisma.Decimal {
     if (!Number.isFinite(value) || !Number.isInteger(value)) {
       throw new BadRequestException(`${label} butun so'm bo'lishi kerak`);
     }
@@ -99,7 +114,7 @@ export class LedgerService {
       select: { balanceUzs: true },
     });
     if (!driver) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     return driver.balanceUzs;
   }
@@ -114,18 +129,21 @@ export class LedgerService {
   ): Promise<WalletMutationResult> {
     const amt = this.amount(input.amountUzs);
     if (amt.lte(0)) {
-      throw new BadRequestException('Top-up miqdori musbat bo‘lishi kerak');
+      throw new BadRequestException("Top-up miqdori musbat bo‘lishi kerak");
     }
     const previousBalance = await this.driverBalanceOrThrow(tx, input.driverId);
     const newBalance = previousBalance.add(amt);
-    await tx.driver.update({ where: { id: input.driverId }, data: { balanceUzs: newBalance } });
+    await tx.driver.update({
+      where: { id: input.driverId },
+      data: { balanceUzs: newBalance },
+    });
     const ledger = await tx.earningsLedger.create({
       data: {
         driverId: input.driverId,
         type: EarningsLedgerType.TOP_UP,
         amountUzs: amt,
         balanceAfterUzs: newBalance,
-        note: input.note?.trim() || 'Admin TOP_UP',
+        note: input.note?.trim() || "Admin TOP_UP",
       },
     });
     return { ledgerId: ledger.id, previousBalance, newBalance };
@@ -137,21 +155,26 @@ export class LedgerService {
   ): Promise<WalletMutationResult> {
     const amt = this.amount(input.amountUzs);
     if (amt.lte(0)) {
-      throw new BadRequestException('Payout miqdori musbat bo‘lishi kerak');
+      throw new BadRequestException("Payout miqdori musbat bo‘lishi kerak");
     }
     const previousBalance = await this.driverBalanceOrThrow(tx, input.driverId);
     if (previousBalance.lt(amt)) {
-      throw new BadRequestException('Balans yetarli emas (payout > joriy balans)');
+      throw new BadRequestException(
+        "Balans yetarli emas (payout > joriy balans)",
+      );
     }
     const newBalance = previousBalance.sub(amt);
-    await tx.driver.update({ where: { id: input.driverId }, data: { balanceUzs: newBalance } });
+    await tx.driver.update({
+      where: { id: input.driverId },
+      data: { balanceUzs: newBalance },
+    });
     const ledger = await tx.earningsLedger.create({
       data: {
         driverId: input.driverId,
         type: EarningsLedgerType.PAYOUT,
         amountUzs: amt,
         balanceAfterUzs: newBalance,
-        note: input.note?.trim() || 'Admin PAYOUT',
+        note: input.note?.trim() || "Admin PAYOUT",
       },
     });
     return { ledgerId: ledger.id, previousBalance, newBalance };
@@ -159,10 +182,15 @@ export class LedgerService {
 
   async recordManualAdjustment(
     tx: LedgerTx,
-    input: { driverId: string; amountUzs: number; note?: string | null; allowNegative?: boolean },
+    input: {
+      driverId: string;
+      amountUzs: number;
+      note?: string | null;
+      allowNegative?: boolean;
+    },
   ): Promise<WalletMutationResult & { type: EarningsLedgerType }> {
     if (input.amountUzs === 0) {
-      throw new BadRequestException('Miqdori 0 bo‘lmasin');
+      throw new BadRequestException("Miqdori 0 bo‘lmasin");
     }
     const delta = this.amount(input.amountUzs);
     const type =
@@ -172,9 +200,14 @@ export class LedgerService {
     const previousBalance = await this.driverBalanceOrThrow(tx, input.driverId);
     const newBalance = previousBalance.add(delta);
     if (!input.allowNegative && newBalance.lt(0)) {
-      throw new BadRequestException("Natijaviy balans manfiy bo'lishi mumkin emas");
+      throw new BadRequestException(
+        "Natijaviy balans manfiy bo'lishi mumkin emas",
+      );
     }
-    await tx.driver.update({ where: { id: input.driverId }, data: { balanceUzs: newBalance } });
+    await tx.driver.update({
+      where: { id: input.driverId },
+      data: { balanceUzs: newBalance },
+    });
     const ledger = await tx.earningsLedger.create({
       data: {
         driverId: input.driverId,
@@ -189,13 +222,21 @@ export class LedgerService {
 
   async recordTripCompletion(
     tx: LedgerTx,
-    input: { driverId: string; orderId: string; tripId: string; split: CommissionSplit },
+    input: {
+      driverId: string;
+      orderId: string;
+      tripId: string;
+      split: CommissionSplit;
+    },
   ): Promise<WalletMutationResult> {
     const previousBalance = await this.driverBalanceOrThrow(tx, input.driverId);
     const newBalance = previousBalance.sub(input.split.commission);
     await tx.driver.update({
       where: { id: input.driverId },
-      data: { operationalStatus: DriverOperationalStatus.ONLINE_IDLE, balanceUzs: newBalance },
+      data: {
+        operationalStatus: DriverOperationalStatus.ONLINE_IDLE,
+        balanceUzs: newBalance,
+      },
     });
     await tx.commissionLedger.create({
       data: {
@@ -203,7 +244,7 @@ export class LedgerService {
         tripId: input.tripId,
         amountUzs: input.split.commission,
         rateBps: input.split.rateBps,
-        note: 'Platform commission (bps)',
+        note: "Platform commission (bps)",
       },
     });
     await tx.earningsLedger.create({
@@ -214,7 +255,7 @@ export class LedgerService {
         balanceAfterUzs: previousBalance,
         orderId: input.orderId,
         tripId: input.tripId,
-        note: 'Passenger cash/gross fare collected by driver',
+        note: "Passenger cash/gross fare collected by driver",
       },
     });
     const ledger = await tx.earningsLedger.create({
@@ -235,7 +276,11 @@ export class LedgerService {
     const [driver, rows] = await Promise.all([
       this.prisma.driver.findUnique({
         where: { id: driverId },
-        select: { id: true, balanceUzs: true, user: { select: { phone: true } } },
+        select: {
+          id: true,
+          balanceUzs: true,
+          user: { select: { phone: true } },
+        },
       }),
       this.prisma.earningsLedger.findMany({
         where: { driverId },
@@ -243,7 +288,7 @@ export class LedgerService {
       }),
     ]);
     if (!driver) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     const zero = new Prisma.Decimal(0);
     const ledgerBalance = rows.reduce((sum, row) => {
@@ -284,24 +329,31 @@ export class LedgerService {
     const { minBroadcastBalanceUzs: minForOrders, lowBalanceUzs: low } =
       await this.resolveCommissionWalletThresholds();
     if (!d) {
-      return { balanceUzs: '0', minRequiredUzs: String(minForOrders), lowBalanceThresholdUzs: String(low), status: 'blocked' };
+      return {
+        balanceUzs: "0",
+        minRequiredUzs: String(minForOrders),
+        lowBalanceThresholdUzs: String(low),
+        status: "blocked",
+      };
     }
     const n = Number(d.balanceUzs);
     return {
       balanceUzs: d.balanceUzs.toString(),
       minRequiredUzs: String(minForOrders),
       lowBalanceThresholdUzs: String(low),
-      status: n < minForOrders ? 'blocked' : n < low ? 'low' : 'ok',
+      status: n < minForOrders ? "blocked" : n < low ? "low" : "ok",
     };
   }
 
   async listEarningsForDriver(driverId: string, limit: number) {
     const rows = await this.prisma.earningsLedger.findMany({
       where: { driverId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
       include: {
-        order: { select: { id: true, pickupLandmark: true, customerPhone: true } },
+        order: {
+          select: { id: true, pickupLandmark: true, customerPhone: true },
+        },
         trip: { select: { id: true, status: true, endedAt: true } },
       },
     });
@@ -340,34 +392,35 @@ export class LedgerService {
     const platformCommissionBps = await this.resolveCommissionBps();
     if (!drv) {
       return {
-        balanceUzs: '0',
-        commissionWalletBalanceUzs: '0',
+        balanceUzs: "0",
+        commissionWalletBalanceUzs: "0",
         minRequiredUzs: String(minForOrders),
         lowBalanceThresholdUzs: String(low),
-        walletStatus: 'blocked',
+        walletStatus: "blocked",
         estimatedTripsLeft: 0,
         tripsCompletedWindow: 0,
         windowDays: w,
-        tripEarningsNetUzs: '0',
-        tripGrossUzs: '0',
-        topUpUzs: '0',
-        commissionDebitedUzs: '0',
-        debtUzs: '0',
-        bonusUzs: '0',
-        payoutOutUzs: '0',
-        adjustmentNetUzs: '0',
+        tripEarningsNetUzs: "0",
+        tripGrossUzs: "0",
+        topUpUzs: "0",
+        commissionDebitedUzs: "0",
+        debtUzs: "0",
+        bonusUzs: "0",
+        payoutOutUzs: "0",
+        adjustmentNetUzs: "0",
         platformCommissionBps,
       };
     }
     const grouped = await this.prisma.earningsLedger.groupBy({
-      by: ['type'],
+      by: ["type"],
       where: { driverId, createdAt: { gte: from } },
       _sum: { amountUzs: true },
     });
     const sum = (t: EarningsLedgerType) =>
       grouped.find((g) => g.type === t)?._sum.amountUzs ?? zero;
     const wallet = Number(drv.balanceUzs);
-    const status = wallet < minForOrders ? 'blocked' : wallet < low ? 'low' : 'ok';
+    const status =
+      wallet < minForOrders ? "blocked" : wallet < low ? "low" : "ok";
     const tripsCompletedWindow = await this.prisma.trip.count({
       where: {
         driverId,
@@ -388,15 +441,24 @@ export class LedgerService {
     if (!Number.isFinite(avgCommission) || avgCommission <= 0) {
       const debitSum = Number(sum(EarningsLedgerType.TRIP_COMMISSION_DEBIT));
       const debitCnt = await this.prisma.earningsLedger.count({
-        where: { driverId, type: EarningsLedgerType.TRIP_COMMISSION_DEBIT, createdAt: { gte: from } },
+        where: {
+          driverId,
+          type: EarningsLedgerType.TRIP_COMMISSION_DEBIT,
+          createdAt: { gte: from },
+        },
       });
       const ledgerAvg = debitCnt > 0 ? debitSum / debitCnt : 0;
-      avgCommission = Number.isFinite(ledgerAvg) && ledgerAvg > 0 ? ledgerAvg : 0;
+      avgCommission =
+        Number.isFinite(ledgerAvg) && ledgerAvg > 0 ? ledgerAvg : 0;
     }
     if (!Number.isFinite(avgCommission) || avgCommission <= 0) {
-      avgCommission = Math.max(1, Math.round(minForOrders * (platformCommissionBps / 10000)));
+      avgCommission = Math.max(
+        1,
+        Math.round(minForOrders * (platformCommissionBps / 10000)),
+      );
     }
-    const estimatedTripsLeft = wallet > 0 ? Math.floor(wallet / Math.max(1, avgCommission)) : 0;
+    const estimatedTripsLeft =
+      wallet > 0 ? Math.floor(wallet / Math.max(1, avgCommission)) : 0;
     return {
       balanceUzs: drv.balanceUzs.toString(),
       commissionWalletBalanceUzs: drv.balanceUzs.toString(),
@@ -409,8 +471,10 @@ export class LedgerService {
       tripEarningsNetUzs: sum(EarningsLedgerType.TRIP_EARNINGS).toString(),
       tripGrossUzs: sum(EarningsLedgerType.TRIP_EARNINGS).toString(),
       topUpUzs: sum(EarningsLedgerType.TOP_UP).toString(),
-      commissionDebitedUzs: sum(EarningsLedgerType.TRIP_COMMISSION_DEBIT).toString(),
-      debtUzs: wallet < 0 ? String(Math.abs(wallet)) : '0',
+      commissionDebitedUzs: sum(
+        EarningsLedgerType.TRIP_COMMISSION_DEBIT,
+      ).toString(),
+      debtUzs: wallet < 0 ? String(Math.abs(wallet)) : "0",
       bonusUzs: sum(EarningsLedgerType.BONUS).toString(),
       payoutOutUzs: sum(EarningsLedgerType.PAYOUT).toString(),
       adjustmentNetUzs: sum(EarningsLedgerType.ADJUSTMENT)

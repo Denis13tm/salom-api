@@ -4,11 +4,11 @@ import {
   ForbiddenException,
   Injectable,
   UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import type { Request } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import type { Request } from "express";
+import { PrismaService } from "../prisma/prisma.service";
 
 type JwtAdminPayload = { sub: string; role: string };
 
@@ -21,22 +21,24 @@ export class SalomAdminGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<
-      Request & { salomAdminId?: string; salomAdminUserId?: string }
-    >();
+    const req = context
+      .switchToHttp()
+      .getRequest<
+        Request & { salomAdminId?: string; salomAdminUserId?: string }
+      >();
     const bearer = this.parseBearer(req);
     if (bearer) {
       try {
         const payload = await this.jwt.verifyAsync<JwtAdminPayload>(bearer);
-        if (payload.role !== 'admin') {
-          throw new ForbiddenException('Not an admin access token');
+        if (payload.role !== "admin") {
+          throw new ForbiddenException("Not an admin access token");
         }
         const a = await this.prisma.admin.findUnique({
           where: { id: payload.sub },
           select: { id: true, userId: true },
         });
         if (!a) {
-          throw new ForbiddenException('Unknown admin');
+          throw new ForbiddenException("Unknown admin");
         }
         req.salomAdminId = a.id;
         req.salomAdminUserId = a.userId;
@@ -45,21 +47,25 @@ export class SalomAdminGuard implements CanActivate {
         if (e instanceof ForbiddenException) {
           throw e;
         }
-        throw new UnauthorizedException('Invalid or expired token');
+        throw new UnauthorizedException("Invalid or expired token");
       }
     }
-    const allow = this.config.get<string>('ALLOW_LEGACY_AUTH_HEADERS', 'false') === 'true';
+    const allow =
+      this.config.get<string>("ALLOW_LEGACY_AUTH_HEADERS", "false") === "true";
     if (!allow) {
-      throw new UnauthorizedException('Authorization Bearer required');
+      throw new UnauthorizedException("Authorization Bearer required");
     }
-    const raw = req.get('x-salom-admin-id');
+    const raw = req.get("x-salom-admin-id");
     const id = raw?.trim();
     if (!id) {
-      throw new UnauthorizedException('Missing X-Salom-Admin-Id or Bearer');
+      throw new UnauthorizedException("Missing X-Salom-Admin-Id or Bearer");
     }
-    const a = await this.prisma.admin.findUnique({ where: { id }, select: { id: true, userId: true } });
+    const a = await this.prisma.admin.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
     if (!a) {
-      throw new ForbiddenException('Unknown admin');
+      throw new ForbiddenException("Unknown admin");
     }
     req.salomAdminId = a.id;
     req.salomAdminUserId = a.userId;
@@ -67,8 +73,8 @@ export class SalomAdminGuard implements CanActivate {
   }
 
   private parseBearer(req: Request): string | null {
-    const a = req.get('authorization');
-    if (!a || !a.toLowerCase().startsWith('bearer ')) {
+    const a = req.get("authorization");
+    if (!a || !a.toLowerCase().startsWith("bearer ")) {
       return null;
     }
     return a.slice(7).trim();

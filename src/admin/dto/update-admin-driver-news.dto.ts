@@ -1,5 +1,12 @@
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
-import { DriverBroadcastAudience } from './send-driver-broadcast.dto';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateIf,
+} from "class-validator";
+import { DriverBroadcastAudience } from "./send-driver-broadcast.dto";
 
 /** Admin `AdminNewsBroadcast` qatorini yangilash (haydovchi ro‘yxatidagi ko‘rinish). */
 export class UpdateAdminDriverNewsDto {
@@ -17,11 +24,17 @@ export class UpdateAdminDriverNewsDto {
   @IsEnum(DriverBroadcastAudience)
   audience?: DriverBroadcastAudience;
 
-  @ValidateIf((o: UpdateAdminDriverNewsDto) => o.audience === DriverBroadcastAudience.ZONE)
+  @ValidateIf(
+    (o: UpdateAdminDriverNewsDto) =>
+      o.audience === DriverBroadcastAudience.ZONE,
+  )
   @IsUUID()
   serviceZoneId?: string;
 
-  @ValidateIf((o: UpdateAdminDriverNewsDto) => o.audience === DriverBroadcastAudience.SINGLE_DRIVER)
+  @ValidateIf(
+    (o: UpdateAdminDriverNewsDto) =>
+      o.audience === DriverBroadcastAudience.SINGLE_DRIVER,
+  )
   @IsUUID()
   driverId?: string;
 }

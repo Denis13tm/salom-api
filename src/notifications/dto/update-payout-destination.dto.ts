@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from "class-validator";
 
 /** Haydovchi o‘zi to‘ldiradigan bank / IBAN. Bo‘sh string = o‘chirish. */
 export class UpdatePayoutDestinationDto {

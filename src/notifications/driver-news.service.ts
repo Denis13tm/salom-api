@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class DriverNewsService {
@@ -17,11 +17,11 @@ export class DriverNewsService {
       return null;
     }
     const or: Prisma.AdminNewsBroadcastWhereInput[] = [
-      { audience: 'all_approved' },
-      { audience: 'single_driver', targetDriverId: driverId },
+      { audience: "all_approved" },
+      { audience: "single_driver", targetDriverId: driverId },
     ];
     if (driver.serviceZoneId) {
-      or.push({ audience: 'zone', serviceZoneId: driver.serviceZoneId });
+      or.push({ audience: "zone", serviceZoneId: driver.serviceZoneId });
     }
     return { OR: or };
   }
@@ -40,7 +40,7 @@ export class DriverNewsService {
 
     const rows = await this.prisma.adminNewsBroadcast.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take,
       select: {
         id: true,

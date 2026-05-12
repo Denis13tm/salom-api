@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsEnum,
   IsNotEmpty,
@@ -6,13 +6,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  MaxLength,
   Min,
-} from 'class-validator';
-import { PaymentType, FareMode } from '@prisma/client';
+} from "class-validator";
+import { PaymentType, FareMode } from "@prisma/client";
 
 export class CreateOrderDto {
-  @IsUUID('4')
+  @IsUUID("4")
   @IsNotEmpty()
   serviceZoneId!: string;
 
@@ -44,7 +43,7 @@ export class CreateOrderDto {
   notes?: string;
 
   @IsEnum(PaymentType)
-  paymentType: PaymentType = 'CASH';
+  paymentType: PaymentType = "CASH";
 
   @IsEnum(FareMode)
   /** Default: yagona taxometr (operator narx kiritmasin) */
@@ -58,6 +57,6 @@ export class CreateOrderDto {
 
   /** Pilot: pickup radius/ring operator tomonidan tanlanishi mumkin; map nuqta bo‘lsa auto. */
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID("4")
   pricingRingId?: string;
 }

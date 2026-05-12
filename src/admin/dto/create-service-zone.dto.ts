@@ -1,5 +1,15 @@
-import { Type } from 'class-transformer';
-import { IsBoolean, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { Type } from "class-transformer";
+import {
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 export class CreateServiceZoneDto {
   @IsString()
@@ -12,7 +22,8 @@ export class CreateServiceZoneDto {
   @MinLength(2)
   @MaxLength(64)
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: 'slug: faqat kichik harf, raqam va tire (masalan: gallaorol yoki navoiy-shahar)',
+    message:
+      "slug: faqat kichik harf, raqam va tire (masalan: gallaorol yoki navoiy-shahar)",
   })
   slug!: string;
 

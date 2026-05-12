@@ -9,16 +9,16 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Express, Request } from 'express';
-import { SalomDriverGuard } from '../tracking/guards/salom-driver.guard';
-import { OnboardingService } from './onboarding.service';
-import { PatchDriverOnboardingDto } from './dto/patch-onboarding.dto';
-import { AddDriverDocumentDto } from './dto/add-driver-document.dto';
-import { UploadDriverDocBodyDto } from './dto/upload-driver-doc-body.dto';
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import type { Express, Request } from "express";
+import { SalomDriverGuard } from "../tracking/guards/salom-driver.guard";
+import { OnboardingService } from "./onboarding.service";
+import { PatchDriverOnboardingDto } from "./dto/patch-onboarding.dto";
+import { AddDriverDocumentDto } from "./dto/add-driver-document.dto";
+import { UploadDriverDocBodyDto } from "./dto/upload-driver-doc-body.dto";
 
-@Controller({ path: 'drivers/me/onboarding', version: '1' })
+@Controller({ path: "drivers/me/onboarding", version: "1" })
 @UseGuards(SalomDriverGuard)
 export class DriverOnboardingMeController {
   constructor(private readonly ob: OnboardingService) {}
@@ -33,19 +33,19 @@ export class DriverOnboardingMeController {
     return this.ob.patchProfile(req.salomDriverId!, body);
   }
 
-  @Post('submit')
+  @Post("submit")
   submit(@Req() req: Request) {
     return this.ob.submitForReview(req.salomDriverId!);
   }
 
-  @Post('documents')
+  @Post("documents")
   addDoc(@Req() req: Request, @Body() body: AddDriverDocumentDto) {
     return this.ob.addDocument(req.salomDriverId!, body);
   }
 
-  @Post('documents/upload')
+  @Post("documents/upload")
   @UseInterceptors(
-    FileInterceptor('file', {
+    FileInterceptor("file", {
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
@@ -55,7 +55,7 @@ export class DriverOnboardingMeController {
     @Body() body: UploadDriverDocBodyDto,
   ) {
     if (!file?.buffer?.length) {
-      throw new BadRequestException('file maydoni majburiy');
+      throw new BadRequestException("file maydoni majburiy");
     }
     return this.ob.uploadDocumentFile(req.salomDriverId!, body.type, file);
   }

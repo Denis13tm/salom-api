@@ -1,5 +1,5 @@
-import { IsEnum } from 'class-validator';
-import { DriverDocumentType } from '@prisma/client';
+import { IsEnum } from "class-validator";
+import { DriverDocumentType } from "@prisma/client";
 
 export class UploadDriverDocBodyDto {
   @IsEnum(DriverDocumentType)

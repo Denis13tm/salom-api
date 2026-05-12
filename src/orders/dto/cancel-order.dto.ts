@@ -1,8 +1,8 @@
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 
 export class CancelOrderDto {
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID("4")
   cancellationReasonId?: string;
 
   @IsOptional()

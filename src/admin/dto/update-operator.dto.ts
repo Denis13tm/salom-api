@@ -1,5 +1,12 @@
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
-import { UserAccountStatus } from '@prisma/client';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { UserAccountStatus } from "@prisma/client";
 
 export class UpdateOperatorDto {
   @IsOptional()

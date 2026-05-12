@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ChatMessageSender } from '@prisma/client';
-import { AdminGateway } from '../tracking/admin.gateway';
-import { DriverGateway } from '../driver-ws/driver.gateway';
-import { PrismaService } from '../prisma/prisma.service';
-import { OperatorGateway } from '../tracking/operator.gateway';
-import { ChatChannel, ChatMessagePayloadV1 } from './operator-chat-ws.types';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { ChatMessageSender } from "@prisma/client";
+import { AdminGateway } from "../tracking/admin.gateway";
+import { DriverGateway } from "../driver-ws/driver.gateway";
+import { PrismaService } from "../prisma/prisma.service";
+import { OperatorGateway } from "../tracking/operator.gateway";
+import { ChatChannel, ChatMessagePayloadV1 } from "./operator-chat-ws.types";
 
 export type ChatMessageDto = {
   id: string;
@@ -48,15 +52,19 @@ export class OperatorChatService {
     });
   }
 
-  async listMessagesForDriver(driverId: string, channel: ChatChannel = 'operator', take = 80) {
-    if (channel === 'admin') {
+  async listMessagesForDriver(
+    driverId: string,
+    channel: ChatChannel = "operator",
+    take = 80,
+  ) {
+    if (channel === "admin") {
       return this.listAdminMessagesForDriver(driverId, take);
     }
     const thread = await this.prisma.driverOperatorChatThread.findUnique({
       where: { driverId },
       include: {
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: Math.min(200, Math.max(1, take)),
           include: {
             operator: { select: { id: true, displayName: true } },
@@ -65,7 +73,10 @@ export class OperatorChatService {
       },
     });
     if (!thread) {
-      return { threadId: null as string | null, messages: [] as ChatMessageDto[] };
+      return {
+        threadId: null as string | null,
+        messages: [] as ChatMessageDto[],
+      };
     }
     const chronological = [...thread.messages].reverse();
     return {
@@ -79,7 +90,7 @@ export class OperatorChatService {
       where: { driverId },
       include: {
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: Math.min(200, Math.max(1, take)),
           include: {
             admin: {
@@ -93,7 +104,10 @@ export class OperatorChatService {
       },
     });
     if (!thread) {
-      return { threadId: null as string | null, messages: [] as ChatMessageDto[] };
+      return {
+        threadId: null as string | null,
+        messages: [] as ChatMessageDto[],
+      };
     }
     const chronological = [...thread.messages].reverse();
     return {
@@ -102,12 +116,16 @@ export class OperatorChatService {
     };
   }
 
-  async sendAsDriver(driverId: string, body: string, channel: ChatChannel = 'operator') {
+  async sendAsDriver(
+    driverId: string,
+    body: string,
+    channel: ChatChannel = "operator",
+  ) {
     const text = body.trim();
     if (!text) {
-      throw new BadRequestException('Bo‘sh xabar');
+      throw new BadRequestException("Bo‘sh xabar");
     }
-    if (channel === 'admin') {
+    if (channel === "admin") {
       const t = await this.ensureAdminThread(driverId);
       const msg = await this.prisma.$transaction(async (tx) => {
         const m = await tx.driverAdminChatMessage.create({
@@ -159,7 +177,7 @@ export class OperatorChatService {
   async listThreadsForOperator() {
     const threads = await this.prisma.driverOperatorChatThread.findMany({
       where: { lastMessageAt: { not: null } },
-      orderBy: { lastMessageAt: 'desc' },
+      orderBy: { lastMessageAt: "desc" },
       take: 200,
       include: {
         driver: {
@@ -173,7 +191,7 @@ export class OperatorChatService {
           },
         },
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 1,
           select: { body: true, createdAt: true, sender: true },
         },
@@ -195,7 +213,10 @@ export class OperatorChatService {
         },
         lastMessage: last
           ? {
-              bodyPreview: last.body.length > 120 ? `${last.body.slice(0, 117)}…` : last.body,
+              bodyPreview:
+                last.body.length > 120
+                  ? `${last.body.slice(0, 117)}…`
+                  : last.body,
               createdAt: last.createdAt.toISOString(),
               sender: last.sender,
             }
@@ -208,7 +229,7 @@ export class OperatorChatService {
   async listThreadsForAdmin() {
     const threads = await this.prisma.driverAdminChatThread.findMany({
       where: { lastMessageAt: { not: null } },
-      orderBy: { lastMessageAt: 'desc' },
+      orderBy: { lastMessageAt: "desc" },
       take: 200,
       include: {
         driver: {
@@ -222,7 +243,7 @@ export class OperatorChatService {
           },
         },
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 1,
           select: { body: true, createdAt: true, sender: true },
         },
@@ -244,7 +265,10 @@ export class OperatorChatService {
         },
         lastMessage: last
           ? {
-              bodyPreview: last.body.length > 120 ? `${last.body.slice(0, 117)}…` : last.body,
+              bodyPreview:
+                last.body.length > 120
+                  ? `${last.body.slice(0, 117)}…`
+                  : last.body,
               createdAt: last.createdAt.toISOString(),
               sender: last.sender,
             }
@@ -259,7 +283,7 @@ export class OperatorChatService {
       where: { driverId },
       include: {
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: Math.min(200, Math.max(1, take)),
           include: {
             operator: { select: { id: true, displayName: true } },
@@ -268,7 +292,11 @@ export class OperatorChatService {
       },
     });
     if (!thread) {
-      return { threadId: null as string | null, driverId, messages: [] as ChatMessageDto[] };
+      return {
+        threadId: null as string | null,
+        driverId,
+        messages: [] as ChatMessageDto[],
+      };
     }
     const chronological = [...thread.messages].reverse();
     return {
@@ -283,7 +311,7 @@ export class OperatorChatService {
       where: { driverId },
       include: {
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: Math.min(200, Math.max(1, take)),
           include: {
             admin: {
@@ -297,7 +325,11 @@ export class OperatorChatService {
       },
     });
     if (!thread) {
-      return { threadId: null as string | null, driverId, messages: [] as ChatMessageDto[] };
+      return {
+        threadId: null as string | null,
+        driverId,
+        messages: [] as ChatMessageDto[],
+      };
     }
     const chronological = [...thread.messages].reverse();
     return {
@@ -310,7 +342,7 @@ export class OperatorChatService {
   async sendAsOperator(operatorId: string, driverId: string, body: string) {
     const text = body.trim();
     if (!text) {
-      throw new BadRequestException('Bo‘sh xabar');
+      throw new BadRequestException("Bo‘sh xabar");
     }
     const t = await this.ensureOperatorThread(driverId);
     const msg = await this.prisma.$transaction(async (tx) => {
@@ -338,7 +370,7 @@ export class OperatorChatService {
   async sendAsAdmin(adminId: string, driverId: string, body: string) {
     const text = body.trim();
     if (!text) {
-      throw new BadRequestException('Bo‘sh xabar');
+      throw new BadRequestException("Bo‘sh xabar");
     }
     const t = await this.ensureAdminThread(driverId);
     const msg = await this.prisma.$transaction(async (tx) => {
@@ -369,9 +401,12 @@ export class OperatorChatService {
   }
 
   async assertDriverExists(driverId: string) {
-    const d = await this.prisma.driver.findUnique({ where: { id: driverId }, select: { id: true } });
+    const d = await this.prisma.driver.findUnique({
+      where: { id: driverId },
+      select: { id: true },
+    });
     if (!d) {
-      throw new NotFoundException('Haydovchi topilmadi');
+      throw new NotFoundException("Haydovchi topilmadi");
     }
   }
 
@@ -423,7 +458,7 @@ export class OperatorChatService {
 
   async markDriverChannelRead(driverId: string, channel: ChatChannel) {
     const now = new Date();
-    if (channel === 'operator') {
+    if (channel === "operator") {
       await this.prisma.driver.update({
         where: { id: driverId },
         data: { operatorChatLastReadAt: now },
@@ -437,13 +472,15 @@ export class OperatorChatService {
     return { ok: true as const };
   }
 
-  private adminLabel(a: { title: string | null; user: { phone: string } } | null): string | null {
+  private adminLabel(
+    a: { title: string | null; user: { phone: string } } | null,
+  ): string | null {
     if (!a) return null;
     const t = a.title?.trim();
     if (t) return t;
     const p = a.user.phone;
     if (p.length >= 4) return `…${p.slice(-4)}`;
-    return 'Administrator';
+    return "Administrator";
   }
 
   private mapOperatorMsg(m: {
@@ -490,7 +527,7 @@ export class OperatorChatService {
   ) {
     const payload: ChatMessagePayloadV1 = {
       v: 1,
-      channel: 'operator',
+      channel: "operator",
       driverId,
       threadId,
       message: {
@@ -506,10 +543,14 @@ export class OperatorChatService {
     this.operatorGateway.emitChatToOperators(payload);
   }
 
-  private broadcastAdmin(threadId: string, driverId: string, message: ChatMessageDto) {
+  private broadcastAdmin(
+    threadId: string,
+    driverId: string,
+    message: ChatMessageDto,
+  ) {
     const payload: ChatMessagePayloadV1 = {
       v: 1,
-      channel: 'admin',
+      channel: "admin",
       driverId,
       threadId,
       message: {

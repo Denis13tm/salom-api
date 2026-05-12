@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { Type } from "class-transformer";
+import { IsInt, IsNumber, IsOptional, Max, Min } from "class-validator";
 
 /** Default pricing profile: kutish va km bazaviy stavkalar (pickup ringlar alohida). */
 export class PatchZonePickupPricingDto {

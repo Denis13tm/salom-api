@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsInt,
@@ -10,7 +10,7 @@ import {
   Min,
   MinLength,
   ValidateIf,
-} from 'class-validator';
+} from "class-validator";
 
 export class AdminCreateVehicleDto {
   @IsString()
@@ -19,9 +19,11 @@ export class AdminCreateVehicleDto {
   plate!: string;
 
   @IsOptional()
-  @ValidateIf((_, v) => v != null && String(v).trim() !== '')
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
-  @Matches(/^\d{2}$/, { message: 'plateRegionCode 2 ta raqam (masalan 01 yoki 10)' })
+  @Matches(/^\d{2}$/, {
+    message: "plateRegionCode 2 ta raqam (masalan 01 yoki 10)",
+  })
   plateRegionCode?: string | null;
 
   @IsString()
@@ -50,9 +52,13 @@ export class AdminPatchVehicleDto {
   plate?: string;
 
   @IsOptional()
-  @ValidateIf((_, v) => v !== undefined && v !== null && String(v).trim() !== '')
+  @ValidateIf(
+    (_, v) => v !== undefined && v !== null && String(v).trim() !== "",
+  )
   @IsString()
-  @Matches(/^\d{2}$/, { message: 'plateRegionCode 2 ta raqam (masalan 01 yoki 10)' })
+  @Matches(/^\d{2}$/, {
+    message: "plateRegionCode 2 ta raqam (masalan 01 yoki 10)",
+  })
   plateRegionCode?: string | null;
 
   @IsOptional()

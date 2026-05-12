@@ -1,4 +1,10 @@
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 export class DriverSendChatDto {
   @IsString()
@@ -7,6 +13,6 @@ export class DriverSendChatDto {
   body!: string;
 
   @IsOptional()
-  @IsIn(['operator', 'admin'])
-  channel?: 'operator' | 'admin';
+  @IsIn(["operator", "admin"])
+  channel?: "operator" | "admin";
 }

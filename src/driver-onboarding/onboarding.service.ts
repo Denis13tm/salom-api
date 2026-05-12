@@ -1,22 +1,22 @@
-import { randomUUID } from 'node:crypto';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { randomUUID } from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import type { Express } from 'express';
+} from "@nestjs/common";
+import type { Express } from "express";
 import {
   DriverDocumentStatus,
   DriverDocumentType,
   DriverOnboardingStatus,
   Prisma,
-} from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { AddDriverDocumentDto } from './dto/add-driver-document.dto';
-import { PatchDriverOnboardingDto } from './dto/patch-onboarding.dto';
+} from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { AddDriverDocumentDto } from "./dto/add-driver-document.dto";
+import { PatchDriverOnboardingDto } from "./dto/patch-onboarding.dto";
 
 @Injectable()
 export class OnboardingService {
@@ -28,8 +28,12 @@ export class OnboardingService {
       include: {
         user: { select: { phone: true, status: true } },
         serviceZone: { select: { id: true, name: true, slug: true } },
-        vehicles: { where: { isActive: true }, orderBy: { createdAt: 'desc' }, take: 2 },
-        documents: { take: 20, orderBy: { createdAt: 'desc' } },
+        vehicles: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 2,
+        },
+        documents: { take: 20, orderBy: { createdAt: "desc" } },
       },
     });
     if (!d) {
@@ -64,7 +68,9 @@ export class OnboardingService {
       DriverOnboardingStatus.REJECTED,
     ];
     if (!ok.includes(d.onboardingStatus)) {
-      throw new ForbiddenException('Ariza faqat DRAFT yoki QAYTA TUZATISH (rad) holatida tahrirlanadi');
+      throw new ForbiddenException(
+        "Ariza faqat DRAFT yoki QAYTA TUZATISH (rad) holatida tahrirlanadi",
+      );
     }
   }
 
@@ -139,21 +145,23 @@ export class OnboardingService {
       throw new NotFoundException();
     }
     if (d.onboardingStatus !== DriverOnboardingStatus.DRAFT) {
-      throw new BadRequestException('Faqat DRAFT holatda yuborish mumkin');
+      throw new BadRequestException("Faqat DRAFT holatda yuborish mumkin");
     }
     if (!d.firstName?.trim() || !d.lastName?.trim() || !d.serviceZoneId) {
-      throw new BadRequestException('Majburiy: ism, familiya, xizmat zonasi');
+      throw new BadRequestException("Majburiy: ism, familiya, xizmat zonasi");
     }
     if (!d.vehicles.length) {
-      throw new BadRequestException('Majburiy: transport (davlat raqami, model)');
+      throw new BadRequestException(
+        "Majburiy: transport (davlat raqami, model)",
+      );
     }
     if (!d.passportOrId?.trim()) {
-      throw new BadRequestException('Majburiy: pasport yoki ID');
+      throw new BadRequestException("Majburiy: pasport yoki ID");
     }
     const docTypes = await this.prisma.driverDocument.findMany({
       where: { driverId },
       select: { type: true },
-      distinct: ['type'],
+      distinct: ["type"],
     });
     const have = new Set(docTypes.map((x) => x.type));
     const need: DriverDocumentType[] = [
@@ -163,7 +171,7 @@ export class OnboardingService {
     ];
     if (!need.every((t) => have.has(t))) {
       throw new BadRequestException(
-        'Majburiy: guvohnomaning oldi, orqa tomoni va o‘zingiz guvohnomani ushlab turganingizdagi 3 alohida surat',
+        "Majburiy: guvohnomaning oldi, orqa tomoni va o‘zingiz guvohnomani ushlab turganingizdagi 3 alohida surat",
       );
     }
     await this.prisma.driver.update({
@@ -200,17 +208,20 @@ export class OnboardingService {
     file: Express.Multer.File,
   ) {
     if (!file?.buffer?.length) {
-      throw new BadRequestException('Fayl bo‘sh');
+      throw new BadRequestException("Fayl bo‘sh");
     }
     const d = await this.prisma.driver.findUnique({ where: { id: driverId } });
     if (!d) {
       throw new NotFoundException();
     }
     this.assertEditable(d);
-    const extRaw = path.extname(file.originalname || '') || '.jpg';
-    const safeExt = extRaw.length <= 8 && extRaw.startsWith('.') ? extRaw : '.jpg';
+    const extRaw = path.extname(file.originalname || "") || ".jpg";
+    const safeExt =
+      extRaw.length <= 8 && extRaw.startsWith(".") ? extRaw : ".jpg";
     const key = `driver-docs/${driverId}/${randomUUID()}${safeExt}`;
-    const root = process.env.DRIVER_DOC_UPLOAD_DIR || path.join(process.cwd(), 'var', 'driver-uploads');
+    const root =
+      process.env.DRIVER_DOC_UPLOAD_DIR ||
+      path.join(process.cwd(), "var", "driver-uploads");
     const full = path.join(root, key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, file.buffer);
@@ -232,16 +243,19 @@ export class OnboardingService {
     file: Express.Multer.File,
   ) {
     if (!file?.buffer?.length) {
-      throw new BadRequestException('Fayl bo‘sh');
+      throw new BadRequestException("Fayl bo‘sh");
     }
     const d = await this.prisma.driver.findUnique({ where: { id: driverId } });
     if (!d) {
       throw new NotFoundException();
     }
-    const extRaw = path.extname(file.originalname || '') || '.jpg';
-    const safeExt = extRaw.length <= 8 && extRaw.startsWith('.') ? extRaw : '.jpg';
+    const extRaw = path.extname(file.originalname || "") || ".jpg";
+    const safeExt =
+      extRaw.length <= 8 && extRaw.startsWith(".") ? extRaw : ".jpg";
     const key = `driver-docs/${driverId}/${randomUUID()}${safeExt}`;
-    const root = process.env.DRIVER_DOC_UPLOAD_DIR || path.join(process.cwd(), 'var', 'driver-uploads');
+    const root =
+      process.env.DRIVER_DOC_UPLOAD_DIR ||
+      path.join(process.cwd(), "var", "driver-uploads");
     const full = path.join(root, key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, file.buffer);
@@ -264,12 +278,15 @@ export class OnboardingService {
     if (!doc) {
       throw new NotFoundException();
     }
-    const root = path.resolve(process.env.DRIVER_DOC_UPLOAD_DIR || path.join(process.cwd(), 'var', 'driver-uploads'));
-    const rel = doc.storageKey.replace(/^[\\/]+/, '');
+    const root = path.resolve(
+      process.env.DRIVER_DOC_UPLOAD_DIR ||
+        path.join(process.cwd(), "var", "driver-uploads"),
+    );
+    const rel = doc.storageKey.replace(/^[\\/]+/, "");
     const full = path.resolve(path.join(root, rel));
     const relative = path.relative(root, full);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new ForbiddenException('Invalid storage path');
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new ForbiddenException("Invalid storage path");
     }
     await fs.unlink(full).catch(() => undefined);
     await this.prisma.driverDocument.delete({ where: { id: documentId } });

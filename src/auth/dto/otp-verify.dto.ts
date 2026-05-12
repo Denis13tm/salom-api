@@ -1,7 +1,7 @@
-import { IsString, IsUUID, Length, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsUUID, Length } from "class-validator";
 
 export class OtpVerifyDto {
-  @IsUUID('4')
+  @IsUUID("4")
   requestId!: string;
 
   @IsString()

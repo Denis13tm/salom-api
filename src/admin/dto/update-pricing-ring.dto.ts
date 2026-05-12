@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsInt,
   IsNumber,
@@ -7,7 +7,7 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 export class UpdatePickupPricingRingDto {
   @IsOptional()

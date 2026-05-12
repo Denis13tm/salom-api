@@ -1,8 +1,15 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { Type } from "class-transformer";
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from "class-validator";
 
 export class RecordTopUpDto {
-  @IsUUID('4')
+  @IsUUID("4")
   driverId!: string;
 
   @Type(() => Number)

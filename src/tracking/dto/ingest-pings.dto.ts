@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,7 +10,7 @@ import {
   Max,
   Min,
   ValidateNested,
-} from 'class-validator';
+} from "class-validator";
 
 export class LocationPingInDto {
   @IsNumber()
@@ -40,11 +40,11 @@ export class LocationPingInDto {
   recordedAt?: string;
 
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID("4")
   orderId?: string;
 
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID("4")
   tripId?: string;
 
   @IsOptional()

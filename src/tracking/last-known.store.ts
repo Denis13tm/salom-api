@@ -1,6 +1,6 @@
-import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
-import type IORedis from 'ioredis';
-import { REDIS_CLIENT } from './redis-tokens';
+import { Inject, Injectable, OnModuleDestroy, Optional } from "@nestjs/common";
+import type IORedis from "ioredis";
+import { REDIS_CLIENT } from "./redis-tokens";
 
 export type LastDriverLocation = {
   driverId: string;
@@ -22,7 +22,9 @@ export class LastKnownStore implements OnModuleDestroy {
   private readonly byZone = new Map<string, Map<string, LastDriverLocation>>();
   private lastZoneByDriver = new Map<string, string | null>();
 
-  constructor(@Optional() @Inject(REDIS_CLIENT) private readonly redis: IORedis | null) {}
+  constructor(
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: IORedis | null,
+  ) {}
 
   onModuleDestroy() {
     if (this.redis) this.redis.disconnect();
@@ -43,7 +45,7 @@ export class LastKnownStore implements OnModuleDestroy {
     }
     if (this.redis) {
       const key = `salom:lk:${snap.driverId}`;
-      void this.redis.set(key, JSON.stringify(snap), 'EX', 3600);
+      void this.redis.set(key, JSON.stringify(snap), "EX", 3600);
     }
   }
 

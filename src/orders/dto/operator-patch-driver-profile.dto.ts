@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsInt,
   IsOptional,
@@ -8,12 +8,14 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
+} from "class-validator";
 
 class OperatorPrimaryVehicleDto {
   @IsOptional() @IsString() @MaxLength(32) plate?: string;
   @IsOptional() @IsString() @MaxLength(200) makeModel?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1990) @Max(2035) year?: number | null;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1990) @Max(2035) year?:
+    | number
+    | null;
   @IsOptional() @IsString() @MaxLength(80) color?: string | null;
 }
 
@@ -24,5 +26,8 @@ export class OperatorPatchDriverProfileDto {
   @IsOptional() @IsString() @MaxLength(200) referralNote?: string | null;
   @IsOptional() @IsString() @IsUUID() serviceZoneId?: string | null;
   @IsOptional() @IsString() @MaxLength(20_000) adminNotes?: string | null;
-  @IsOptional() @ValidateNested() @Type(() => OperatorPrimaryVehicleDto) primaryVehicle?: OperatorPrimaryVehicleDto;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => OperatorPrimaryVehicleDto)
+  primaryVehicle?: OperatorPrimaryVehicleDto;
 }

@@ -1,6 +1,6 @@
-import { IsIn } from 'class-validator';
+import { IsIn } from "class-validator";
 
 export class MarkChatReadDto {
-  @IsIn(['operator', 'admin'])
-  channel!: 'operator' | 'admin';
+  @IsIn(["operator", "admin"])
+  channel!: "operator" | "admin";
 }

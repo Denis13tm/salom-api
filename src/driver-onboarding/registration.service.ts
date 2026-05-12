@@ -1,8 +1,12 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { DriverOnboardingStatus, UserAccountStatus, UserRole } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { normalizePhoneUz } from './phone.util';
-import { RegisterDriverDto } from './dto/register-driver.dto';
+import { ConflictException, Injectable } from "@nestjs/common";
+import {
+  DriverOnboardingStatus,
+  UserAccountStatus,
+  UserRole,
+} from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { normalizePhoneUz } from "./phone.util";
+import { RegisterDriverDto } from "./dto/register-driver.dto";
 
 @Injectable()
 export class RegistrationService {
@@ -13,9 +17,11 @@ export class RegistrationService {
     const existing = await this.prisma.user.findUnique({ where: { phone } });
     if (existing) {
       if (existing.role === UserRole.DRIVER) {
-        throw new ConflictException('Ushbu raqam bilan haydovchi allaqachon mavjud');
+        throw new ConflictException(
+          "Ushbu raqam bilan haydovchi allaqachon mavjud",
+        );
       }
-      throw new ConflictException('Telefon allaqachon ro‘yxatda');
+      throw new ConflictException("Telefon allaqachon ro‘yxatda");
     }
     const user = await this.prisma.user.create({
       data: {
@@ -35,7 +41,8 @@ export class RegistrationService {
     return {
       ok: true as const,
       driverId: driver.id,
-      message: 'Keyingi qadam: POST /api/v1/auth/driver/registration/otp/request (SMS kod)',
+      message:
+        "Keyingi qadam: POST /api/v1/auth/driver/registration/otp/request (SMS kod)",
     };
   }
 }

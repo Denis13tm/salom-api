@@ -1,8 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Controller, Get } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 /** Ro‘yxatdan o‘tish / ariza uchun faol xizmat zonalari (UUID tanlash). */
-@Controller({ path: 'public/service-zones', version: '1' })
+@Controller({ path: "public/service-zones", version: "1" })
 export class PublicServiceZonesController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -30,7 +30,7 @@ export class PublicServiceZonesController {
             freeWaitMinutes: true,
             waitPerMinuteUzs: true,
             rings: {
-              orderBy: { sortOrder: 'asc' },
+              orderBy: { sortOrder: "asc" },
               select: {
                 id: true,
                 code: true,
@@ -45,7 +45,7 @@ export class PublicServiceZonesController {
           },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
     return rows.map((z) => ({
       id: z.id,
@@ -55,7 +55,10 @@ export class PublicServiceZonesController {
       centerLng: z.centerLng != null ? Number(z.centerLng) : null,
       starterFeeUzs: z.starterFeeUzs != null ? Number(z.starterFeeUzs) : null,
       waitingFreeMinutes: z.waitingFreeMinutes ?? null,
-      waitingFeePerMinuteUzs: z.waitingFeePerMinuteUzs != null ? Number(z.waitingFeePerMinuteUzs) : null,
+      waitingFeePerMinuteUzs:
+        z.waitingFeePerMinuteUzs != null
+          ? Number(z.waitingFeePerMinuteUzs)
+          : null,
       pricingProfile: z.pricingProfiles[0]
         ? {
             id: z.pricingProfiles[0].id,
@@ -71,7 +74,8 @@ export class PublicServiceZonesController {
               radiusFromKm: Number(r.radiusFromKm),
               radiusToKm: r.radiusToKm == null ? null : Number(r.radiusToKm),
               starterFeeUzs: Number(r.starterFeeUzs),
-              distanceRateUzs: r.distanceRateUzs == null ? null : Number(r.distanceRateUzs),
+              distanceRateUzs:
+                r.distanceRateUzs == null ? null : Number(r.distanceRateUzs),
               sortOrder: r.sortOrder,
             })),
           }

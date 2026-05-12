@@ -1,11 +1,15 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { IngestPingsBodyDto, LocationPingInDto } from './dto/ingest-pings.dto';
-import { LastKnownStore, LastDriverLocation } from './last-known.store';
-import { isPingQualityOk, isPlausibleStep } from './location-quality';
-import { OperatorGateway } from './operator.gateway';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { IngestPingsBodyDto, LocationPingInDto } from "./dto/ingest-pings.dto";
+import { LastKnownStore, LastDriverLocation } from "./last-known.store";
+import { isPingQualityOk, isPlausibleStep } from "./location-quality";
+import { OperatorGateway } from "./operator.gateway";
 
 @Injectable()
 export class TrackingService {
@@ -17,21 +21,24 @@ export class TrackingService {
   ) {}
 
   assertSnapshotAccess(headers: Record<string, string | string[] | undefined>) {
-    const key = this.config.get<string | undefined>('TRACKING_SNAPSHOT_KEY');
-    const env = this.config.get<string>('NODE_ENV');
+    const key = this.config.get<string | undefined>("TRACKING_SNAPSHOT_KEY");
+    const env = this.config.get<string>("NODE_ENV");
     if (key) {
-      const h = headers['x-snapshot-key'];
+      const h = headers["x-snapshot-key"];
       const v = Array.isArray(h) ? h[0] : h;
       if (v !== key) throw new ForbiddenException();
       return;
     }
-    if (env === 'production') {
-      throw new ForbiddenException('TRACKING_SNAPSHOT_KEY is not set');
+    if (env === "production") {
+      throw new ForbiddenException("TRACKING_SNAPSHOT_KEY is not set");
     }
   }
 
   getZoneSnapshot(serviceZoneId: string) {
-    return { serviceZoneId, drivers: this.lastKnown.getZoneSnapshot(serviceZoneId) };
+    return {
+      serviceZoneId,
+      drivers: this.lastKnown.getZoneSnapshot(serviceZoneId),
+    };
   }
 
   /** Operator panel: zonal haydovchilar + so‘nggi GPS (mavjud bo‘lsa). */
@@ -41,7 +48,7 @@ export class TrackingService {
       select: { id: true },
     });
     if (!zone) {
-      throw new NotFoundException('Zona topilmadi');
+      throw new NotFoundException("Zona topilmadi");
     }
     const drivers = await this.prisma.driver.findMany({
       where: { serviceZoneId },
@@ -54,7 +61,7 @@ export class TrackingService {
         user: { select: { phone: true, status: true } },
       },
       take: 400,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
     });
     const snaps = this.lastKnown.getZoneSnapshot(serviceZoneId);
     const byMem = new Map(snaps.map((s) => [s.driverId, s]));
@@ -116,7 +123,7 @@ export class TrackingService {
               accuracyM: mem.accuracyM,
               speedKmh: mem.speedKmh,
             }
-          : db ?? null;
+          : (db ?? null);
         return {
           id: d.id,
           firstName: d.firstName,
@@ -136,10 +143,13 @@ export class TrackingService {
       where: { id: driverId },
       select: { id: true, serviceZoneId: true },
     });
-    if (!driver) throw new NotFoundException('Driver not found');
+    if (!driver) throw new NotFoundException("Driver not found");
 
-    const maxAge = this.config.get<number>('TRACKING_MAX_PING_AGE_MINUTES', 2);
-    const maxAccuracyM = this.config.get<number>('TRACKING_MAX_ACCURACY_M', 2000);
+    const maxAge = this.config.get<number>("TRACKING_MAX_PING_AGE_MINUTES", 2);
+    const maxAccuracyM = this.config.get<number>(
+      "TRACKING_MAX_ACCURACY_M",
+      2000,
+    );
     const sorted = [...body.pings].sort((a, b) => {
       const ta = new Date(a.recordedAt ?? 0).getTime() || 0;
       const tb = new Date(b.recordedAt ?? 0).getTime() || 0;
@@ -169,7 +179,8 @@ export class TrackingService {
           }
         : null;
       if (!isPlausibleStep(prev, { lat: p.lat, lng: p.lng, t })) {
-        if (skipSample.length < 5) skipSample.push({ reason: 'implausible_step' });
+        if (skipSample.length < 5)
+          skipSample.push({ reason: "implausible_step" });
         continue;
       }
       accepted.push({ ...p, recordedAt: recordedAtStr });
@@ -197,12 +208,12 @@ export class TrackingService {
       accuracyM: p.accuracyM,
       speedKmh: p.speedKmh,
       recordedAt: new Date(p.recordedAt!),
-      source: p.source ?? 'gps',
+      source: p.source ?? "gps",
     }));
 
     await this.prisma.locationPing.createMany({ data });
 
-    const last = accepted[accepted.length - 1]!;
+    const last = accepted[accepted.length - 1];
     const snap: LastDriverLocation = {
       driverId,
       serviceZoneId: driver.serviceZoneId,

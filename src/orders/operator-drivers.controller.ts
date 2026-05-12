@@ -12,14 +12,14 @@ import {
   Query,
   Req,
   UseGuards,
-} from '@nestjs/common';
-import type { Request } from 'express';
-import { Prisma } from '@prisma/client';
-import { AdminService } from '../admin/admin.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { TrackingService } from '../tracking/tracking.service';
-import { OperatorPatchDriverProfileDto } from './dto/operator-patch-driver-profile.dto';
-import { SalomOperatorGuard } from './guards/salom-operator.guard';
+} from "@nestjs/common";
+import type { Request } from "express";
+import { Prisma } from "@prisma/client";
+import { AdminService } from "../admin/admin.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { TrackingService } from "../tracking/tracking.service";
+import { OperatorPatchDriverProfileDto } from "./dto/operator-patch-driver-profile.dto";
+import { SalomOperatorGuard } from "./guards/salom-operator.guard";
 
 const OPERATOR_NO_DRIVER_DELETE = new ForbiddenException(
   "Haydovchini o‘chirish faqat Admin panel orqali mumkin.",
@@ -31,7 +31,7 @@ const OPERATOR_PROFILE_EDIT_FORBIDDEN = new ForbiddenException(
   "Haydovchining shaxsiy ma’lumoti, zonasi va transportini tahrirlash faqat Administrator uchun. Operator faqat ichki eslatmani (Operator eslatmasi) yangilashi mumkin.",
 );
 
-@Controller({ path: 'operator/drivers', version: '1' })
+@Controller({ path: "operator/drivers", version: "1" })
 @UseGuards(SalomOperatorGuard)
 export class OperatorDriversController {
   constructor(
@@ -41,16 +41,16 @@ export class OperatorDriversController {
   ) {}
 
   @Get()
-  list(@Req() req: Request, @Query('serviceZoneId') serviceZoneId?: string) {
+  list(@Req() req: Request, @Query("serviceZoneId") serviceZoneId?: string) {
     return this.resolvedZoneRoster(req.salomOperatorId!, serviceZoneId);
   }
 
   /** Tanlangan zonadagi haydovchi — operatsiya uchun yengil profil (moliya/hujjatlar — Admin). */
-  @Get(':driverId/profile')
+  @Get(":driverId/profile")
   async getProfile(
     @Req() req: Request,
-    @Param('driverId') driverId: string,
-    @Query('serviceZoneId') serviceZoneId?: string,
+    @Param("driverId") driverId: string,
+    @Query("serviceZoneId") serviceZoneId?: string,
   ) {
     const opId = req.salomOperatorId!;
     const zone = await this.resolvedServiceZoneId(opId, serviceZoneId);
@@ -58,11 +58,11 @@ export class OperatorDriversController {
     return this.admin.getDriverProfileForOperator(driverId);
   }
 
-  @Patch(':driverId/profile')
+  @Patch(":driverId/profile")
   async patchProfile(
     @Req() req: Request,
-    @Param('driverId') driverId: string,
-    @Query('serviceZoneId') serviceZoneId: string | undefined,
+    @Param("driverId") driverId: string,
+    @Query("serviceZoneId") serviceZoneId: string | undefined,
     @Body() body: OperatorPatchDriverProfileDto,
   ) {
     const opId = req.salomOperatorId!;
@@ -92,13 +92,13 @@ export class OperatorDriversController {
     return this.admin.getDriverProfileForOperator(driverId);
   }
 
-  @Delete(':driverId')
+  @Delete(":driverId")
   @HttpCode(200)
   deleteDriver() {
     throw OPERATOR_NO_DRIVER_DELETE;
   }
 
-  @Get(':driverId/documents/:docId/file')
+  @Get(":driverId/documents/:docId/file")
   getDocumentFile(): never {
     throw OPERATOR_NO_DRIVER_DOCS;
   }
@@ -108,28 +108,38 @@ export class OperatorDriversController {
     return this.tracking.listDriversRosterForZone(zone);
   }
 
-  private async resolvedServiceZoneId(operatorId: string, serviceZoneId?: string) {
+  private async resolvedServiceZoneId(
+    operatorId: string,
+    serviceZoneId?: string,
+  ) {
     const op = await this.prisma.operator.findUnique({
       where: { id: operatorId },
       select: { serviceZoneId: true },
     });
     const zone = (serviceZoneId?.trim() || op?.serviceZoneId)?.trim() || null;
     if (!zone) {
-      throw new BadRequestException('serviceZoneId kerak (query) yoki operator profilida zona belgilangan bo‘lsin');
+      throw new BadRequestException(
+        "serviceZoneId kerak (query) yoki operator profilida zona belgilangan bo‘lsin",
+      );
     }
     return zone;
   }
 
-  private async assertDriverInServiceZone(driverId: string, serviceZoneId: string) {
+  private async assertDriverInServiceZone(
+    driverId: string,
+    serviceZoneId: string,
+  ) {
     const row = await this.prisma.driver.findUnique({
       where: { id: driverId },
       select: { id: true, serviceZoneId: true },
     });
     if (!row) {
-      throw new NotFoundException('Haydovchi topilmadi');
+      throw new NotFoundException("Haydovchi topilmadi");
     }
     if (row.serviceZoneId !== serviceZoneId) {
-      throw new ForbiddenException('Bu haydovchi tanlangan xizmat zonasida emas');
+      throw new ForbiddenException(
+        "Bu haydovchi tanlangan xizmat zonasida emas",
+      );
     }
   }
 }

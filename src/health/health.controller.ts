@@ -1,12 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get } from "@nestjs/common";
 import {
   HealthCheck,
   HealthCheckService,
   MemoryHealthIndicator,
-} from '@nestjs/terminus';
-import { PrismaHealthIndicator } from './prisma-health.indicator';
+} from "@nestjs/terminus";
+import { PrismaHealthIndicator } from "./prisma-health.indicator";
 
-@Controller('health')
+@Controller("health")
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
@@ -18,8 +18,8 @@ export class HealthController {
   @HealthCheck()
   check() {
     return this.health.check([
-      () => this.memory.checkHeap('heap', 300 * 1024 * 1024),
-      () => this.prismaHealth.isHealthy('database'),
+      () => this.memory.checkHeap("heap", 300 * 1024 * 1024),
+      () => this.prismaHealth.isHealthy("database"),
     ]);
   }
 }

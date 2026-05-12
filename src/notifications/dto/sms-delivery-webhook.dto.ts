@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID } from "class-validator";
 
 /** Provayder `POST /api/v1/webhooks/sms/delivery` — `X-Salom-Sms-Secret`. */
 export class SmsDeliveryWebhookDto {
@@ -6,8 +6,8 @@ export class SmsDeliveryWebhookDto {
   logId!: string;
 
   @IsString()
-  @IsIn(['DELIVERED', 'FAILED', 'SENT'])
-  status!: 'DELIVERED' | 'FAILED' | 'SENT';
+  @IsIn(["DELIVERED", "FAILED", "SENT"])
+  status!: "DELIVERED" | "FAILED" | "SENT";
 
   @IsOptional()
   @IsString()

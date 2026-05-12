@@ -1,4 +1,15 @@
-import { IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+} from "class-validator";
 
 export class PatchDriverOnboardingDto {
   @IsOptional()
@@ -31,9 +42,9 @@ export class PatchDriverOnboardingDto {
   vehiclePlate?: string;
 
   @IsOptional()
-  @ValidateIf((_, v) => v != null && String(v).trim() !== '')
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
-  @Matches(/^\d{2}$/, { message: 'Viloyat kodi 2 ta raqam (masalan 01)' })
+  @Matches(/^\d{2}$/, { message: "Viloyat kodi 2 ta raqam (masalan 01)" })
   vehiclePlateRegionCode?: string;
 
   @IsOptional()

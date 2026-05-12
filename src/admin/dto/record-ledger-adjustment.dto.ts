@@ -1,8 +1,14 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from "class-transformer";
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from "class-validator";
 
 export class RecordLedgerAdjustmentDto {
-  @IsUUID('4')
+  @IsUUID("4")
   driverId!: string;
 
   /** Musbat — balansga qo‘shish; manfiy — ayirish (komissiya tuzatish, qaytarish). */

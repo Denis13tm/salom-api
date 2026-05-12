@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsInt,
   IsOptional,
@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
   ValidateNested,
-} from 'class-validator';
+} from "class-validator";
 
 export class CreateDriverVehicleNestedDto {
   @IsString()
@@ -18,9 +18,11 @@ export class CreateDriverVehicleNestedDto {
   plate!: string;
 
   @IsOptional()
-  @ValidateIf((_, v) => v != null && String(v).trim() !== '')
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
-  @Matches(/^\d{2}$/, { message: 'Viloyat kodi 2 ta raqam (masalan 01 yoki 10)' })
+  @Matches(/^\d{2}$/, {
+    message: "Viloyat kodi 2 ta raqam (masalan 01 yoki 10)",
+  })
   plateRegionCode?: string | null;
 
   @IsString()
@@ -68,7 +70,7 @@ export class CreateDriverAdminDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{12}$/, { message: 'activationCode 12 ta raqam bo‘lishi kerak' })
+  @Matches(/^\d{12}$/, { message: "activationCode 12 ta raqam bo‘lishi kerak" })
   activationCode?: string;
 
   @IsOptional()

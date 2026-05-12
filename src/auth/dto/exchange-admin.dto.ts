@@ -1,6 +1,6 @@
-import { IsUUID } from 'class-validator';
+import { IsUUID } from "class-validator";
 
 export class ExchangeAdminDto {
-  @IsUUID('4')
+  @IsUUID("4")
   adminId!: string;
 }

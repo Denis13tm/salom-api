@@ -1,5 +1,5 @@
-import { IsEnum, IsString, MinLength, MaxLength } from 'class-validator';
-import { DriverDocumentType } from '@prisma/client';
+import { IsEnum, IsString, MinLength, MaxLength } from "class-validator";
+import { DriverDocumentType } from "@prisma/client";
 
 export class AddDriverDocumentDto {
   @IsEnum(DriverDocumentType)

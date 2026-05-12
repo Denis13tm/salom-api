@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   DriverOperationalStatus,
   OrderAssignmentStatus,
@@ -12,11 +12,11 @@ import {
   Prisma,
   TripEventType,
   TripStatus,
-} from '@prisma/client';
-import { OperationalNotificationsService } from '../notifications/operational-notifications.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { OperatorGateway } from '../tracking/operator.gateway';
-import { DriverGateway } from '../driver-ws/driver.gateway';
+} from "@prisma/client";
+import { OperationalNotificationsService } from "../notifications/operational-notifications.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { OperatorGateway } from "../tracking/operator.gateway";
+import { DriverGateway } from "../driver-ws/driver.gateway";
 
 const TERMINAL: ReadonlySet<OrderStatus> = new Set([
   OrderStatus.COMPLETED,
@@ -50,7 +50,10 @@ export class OrderLifecycleService {
         data: { status: OrderAssignmentStatus.SUPERSEDED, decidedAt: now },
       });
       await tx.driver.updateMany({
-        where: { id: p.driverId, operationalStatus: DriverOperationalStatus.ORDER_OFFERED },
+        where: {
+          id: p.driverId,
+          operationalStatus: DriverOperationalStatus.ORDER_OFFERED,
+        },
         data: { operationalStatus: DriverOperationalStatus.ONLINE_IDLE },
       });
     }
@@ -99,15 +102,18 @@ export class OrderLifecycleService {
     input: { cancellationReasonId?: string; cancelNote?: string },
   ) {
     const o = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!o) throw new NotFoundException('Order');
+    if (!o) throw new NotFoundException("Order");
     if (o.assignedDriverId !== driverId) {
-      throw new ForbiddenException('Not your order');
+      throw new ForbiddenException("Not your order");
     }
     if (TERMINAL.has(o.status)) {
-      throw new ConflictException('Order already closed');
+      throw new ConflictException("Order already closed");
     }
-    if (o.status === OrderStatus.CREATED || o.status === OrderStatus.BROADCASTED) {
-      throw new BadRequestException('Driver cannot cancel before acceptance');
+    if (
+      o.status === OrderStatus.CREATED ||
+      o.status === OrderStatus.BROADCASTED
+    ) {
+      throw new BadRequestException("Driver cannot cancel before acceptance");
     }
     const out = await this.applyTerminalCancel(orderId, {
       targetStatus: OrderStatus.CANCELLED_BY_DRIVER,
@@ -132,32 +138,34 @@ export class OrderLifecycleService {
    */
   async markPassengerNoShow(
     orderId: string,
-    actor: { type: 'operator' } | { type: 'driver'; driverId: string },
+    actor: { type: "operator" } | { type: "driver"; driverId: string },
     input: { cancellationReasonId?: string; cancelNote?: string },
   ) {
     const o = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { trip: true },
     });
-    if (!o) throw new NotFoundException('Order');
+    if (!o) throw new NotFoundException("Order");
     if (o.status !== OrderStatus.DRIVER_ARRIVING) {
-      throw new ConflictException('No-show only when DRIVER_ARRIVING');
+      throw new ConflictException("No-show only when DRIVER_ARRIVING");
     }
     if (!o.trip || o.trip.status !== TripStatus.NOT_STARTED) {
-      throw new ConflictException('Trip must exist and be NOT_STARTED');
+      throw new ConflictException("Trip must exist and be NOT_STARTED");
     }
-    if (actor.type === 'driver' && o.assignedDriverId !== actor.driverId) {
-      throw new ForbiddenException('Not your order');
+    if (actor.type === "driver" && o.assignedDriverId !== actor.driverId) {
+      throw new ForbiddenException("Not your order");
     }
     let reasonId = input.cancellationReasonId;
     if (!reasonId) {
-      const r = await this.prisma.cancellationReason.findUnique({ where: { code: 'passenger_no_show' } });
+      const r = await this.prisma.cancellationReason.findUnique({
+        where: { code: "passenger_no_show" },
+      });
       if (r) reasonId = r.id;
     }
     const out = await this.applyTerminalCancel(orderId, {
       targetStatus: OrderStatus.CANCELLED_BY_PASSENGER,
       cancellationReasonId: reasonId,
-      cancelNote: input.cancelNote ?? 'passenger_no_show',
+      cancelNote: input.cancelNote ?? "passenger_no_show",
     });
     const fresh = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -175,7 +183,11 @@ export class OrderLifecycleService {
 
   private async applyTerminalCancel(
     orderId: string,
-    input: { targetStatus: OrderStatus; cancellationReasonId?: string; cancelNote?: string },
+    input: {
+      targetStatus: OrderStatus;
+      cancellationReasonId?: string;
+      cancelNote?: string;
+    },
   ) {
     const now = new Date();
     const out = await this.prisma.$transaction(async (tx) => {
@@ -184,20 +196,20 @@ export class OrderLifecycleService {
         include: { trip: true },
       });
       if (!order) {
-        throw new NotFoundException('Order');
+        throw new NotFoundException("Order");
       }
       if (TERMINAL.has(order.status)) {
-        throw new ConflictException('Order already closed');
+        throw new ConflictException("Order already closed");
       }
       if (order.status === OrderStatus.COMPLETED) {
-        throw new ConflictException('Cannot cancel completed order');
+        throw new ConflictException("Cannot cancel completed order");
       }
 
       await this.supersedePendingAssignments(tx, orderId, now);
 
       if (order.trip) {
         if (order.trip.status === TripStatus.COMPLETED) {
-          throw new ConflictException('Trip already completed');
+          throw new ConflictException("Trip already completed");
         }
         if (order.trip.status !== TripStatus.CANCELLED) {
           await tx.trip.update({
@@ -208,7 +220,10 @@ export class OrderLifecycleService {
             data: {
               tripId: order.trip.id,
               type: TripEventType.NOTE,
-              payload: { kind: 'order_cancelled', at: now.toISOString() } as object,
+              payload: {
+                kind: "order_cancelled",
+                at: now.toISOString(),
+              },
             },
           });
         }
@@ -231,14 +246,20 @@ export class OrderLifecycleService {
     });
 
     this.operatorGateway.emitOrderUpdate(out.order.serviceZoneId, {
-      type: 'order_cancelled',
+      type: "order_cancelled",
       orderId,
       status: out.order.status,
     });
     if (out.order.assignedDriverId) {
-      this.driverGateway.emitOrderCancelled(out.order.assignedDriverId, { orderId, status: out.order.status });
+      this.driverGateway.emitOrderCancelled(out.order.assignedDriverId, {
+        orderId,
+        status: out.order.status,
+      });
       try {
-        await this.notify.notifyDriverOrderCancelled(out.order.assignedDriverId, orderId);
+        await this.notify.notifyDriverOrderCancelled(
+          out.order.assignedDriverId,
+          orderId,
+        );
       } catch {
         /* */
       }
@@ -250,7 +271,7 @@ export class OrderLifecycleService {
   listCancellationReasons() {
     return this.prisma.cancellationReason.findMany({
       where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
       select: { id: true, code: true, labelUz: true, sortOrder: true },
     });
   }

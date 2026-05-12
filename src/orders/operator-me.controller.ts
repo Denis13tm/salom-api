@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
-import type { Request } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
-import { SalomOperatorGuard } from './guards/salom-operator.guard';
-import { UpdateOperatorSelfDto } from './dto/update-operator-self.dto';
-import { normalizePhoneUz } from '../driver-onboarding/phone.util';
+import { Body, Controller, Get, Patch, Req, UseGuards } from "@nestjs/common";
+import type { Request } from "express";
+import { PrismaService } from "../prisma/prisma.service";
+import { SalomOperatorGuard } from "./guards/salom-operator.guard";
+import { UpdateOperatorSelfDto } from "./dto/update-operator-self.dto";
+import { normalizePhoneUz } from "../driver-onboarding/phone.util";
 
-@Controller({ path: 'operator/me', version: '1' })
+@Controller({ path: "operator/me", version: "1" })
 @UseGuards(SalomOperatorGuard)
 export class OperatorMeController {
   constructor(private readonly prisma: PrismaService) {}
@@ -16,7 +16,14 @@ export class OperatorMeController {
     const op = await this.prisma.operator.findUniqueOrThrow({
       where: { id },
       include: {
-        user: { select: { phone: true, status: true, lastLoginAt: true, createdAt: true } },
+        user: {
+          select: {
+            phone: true,
+            status: true,
+            lastLoginAt: true,
+            createdAt: true,
+          },
+        },
         serviceZone: { select: { id: true, name: true, slug: true } },
       },
     });

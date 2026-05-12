@@ -4,8 +4,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   DriverOnboardingStatus,
   DriverOperationalStatus,
@@ -17,33 +17,38 @@ import {
   TripStatus,
   UserAccountStatus,
   UserRole,
-} from '@prisma/client';
-import { randomInt, randomUUID } from 'node:crypto';
-import * as bcrypt from 'bcrypt';
-import { createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
-import type { ReadStream } from 'node:fs';
-import * as path from 'node:path';
-import { SmsService } from '../notifications/sms.service';
-import { PushService } from '../notifications/push.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { LedgerService } from '../ledger/ledger.service';
-import type { DriverNoticeCategory } from '../driver-ws/driver-notice-payload';
-import { DriverGateway } from '../driver-ws/driver.gateway';
-import { normalizePhoneUz } from '../driver-onboarding/phone.util';
-import type { PatchPlatformChampionsDto } from './dto/patch-platform-champions.dto';
-import type { PatchPlatformPricingDto } from './dto/patch-platform-pricing.dto';
-import { DriverBroadcastAudience, SendDriverBroadcastDto } from './dto/send-driver-broadcast.dto';
-import type { UpdateAdminDriverNewsDto } from './dto/update-admin-driver-news.dto';
-import type { PatchZonePickupPricingDto } from './dto/patch-zone-pickup-pricing.dto';
-import type { CreatePickupPricingRingDto } from './dto/create-pricing-ring.dto';
-import type { UpdatePickupPricingRingDto } from './dto/update-pricing-ring.dto';
-import { PricingEngineService } from '../orders/pricing-engine.service';
-import { GamificationService } from '../gamification/gamification.service';
-import type { PatchDriverXpSettingsDto } from './dto/patch-driver-xp-settings.dto';
+} from "@prisma/client";
+import { randomInt, randomUUID } from "node:crypto";
+import * as bcrypt from "bcrypt";
+import { createReadStream } from "node:fs";
+import { access } from "node:fs/promises";
+import type { ReadStream } from "node:fs";
+import * as path from "node:path";
+import { SmsService } from "../notifications/sms.service";
+import { PushService } from "../notifications/push.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { LedgerService } from "../ledger/ledger.service";
+import type { DriverNoticeCategory } from "../driver-ws/driver-notice-payload";
+import { DriverGateway } from "../driver-ws/driver.gateway";
+import { normalizePhoneUz } from "../driver-onboarding/phone.util";
+import type { PatchPlatformChampionsDto } from "./dto/patch-platform-champions.dto";
+import type { PatchPlatformPricingDto } from "./dto/patch-platform-pricing.dto";
+import {
+  DriverBroadcastAudience,
+  SendDriverBroadcastDto,
+} from "./dto/send-driver-broadcast.dto";
+import type { UpdateAdminDriverNewsDto } from "./dto/update-admin-driver-news.dto";
+import type { PatchZonePickupPricingDto } from "./dto/patch-zone-pickup-pricing.dto";
+import type { CreatePickupPricingRingDto } from "./dto/create-pricing-ring.dto";
+import type { UpdatePickupPricingRingDto } from "./dto/update-pricing-ring.dto";
+import { PricingEngineService } from "../orders/pricing-engine.service";
+import { GamificationService } from "../gamification/gamification.service";
+import type { PatchDriverXpSettingsDto } from "./dto/patch-driver-xp-settings.dto";
 
 function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0),
+  );
 }
 
 @Injectable()
@@ -60,9 +65,9 @@ export class AdminService {
   ) {}
 
   async platformPricing() {
-    const envBps = this.config.get<number>('PLATFORM_COMMISSION_BPS', 1000);
+    const envBps = this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: { platformCommissionBps: true },
     });
     const platformCommissionBps = Math.max(
@@ -71,45 +76,69 @@ export class AdminService {
     );
     const wallet = await this.ledger.resolveCommissionWalletThresholds();
     return {
-      meterBaseUzs: this.config.get<number>('METER_BASE_FARE_UZS', 5000),
-      meterPerKmUzs: this.config.get<number>('METER_PER_KM_UZS', 5000),
-      meterMinSegmentM: this.config.get<number>('METER_MIN_SEGMENT_M', 12),
+      meterBaseUzs: this.config.get<number>("METER_BASE_FARE_UZS", 5000),
+      meterPerKmUzs: this.config.get<number>("METER_PER_KM_UZS", 5000),
+      meterMinSegmentM: this.config.get<number>("METER_MIN_SEGMENT_M", 12),
       platformCommissionBps,
       commissionWalletMinDispatchBalanceUzs: wallet.minBroadcastBalanceUzs,
       commissionWalletLowBalanceUzs: wallet.lowBalanceUzs,
       ledgerRoundingNote:
-        'Bruto butun UZS, komissiya: floor(gross * bps / 10_000), net = bruto - komissiya. ADJUSTMENT ixtiyoriy tuzatish.',
+        "Bruto butun UZS, komissiya: floor(gross * bps / 10_000), net = bruto - komissiya. ADJUSTMENT ixtiyoriy tuzatish.",
     };
   }
 
-  async patchPlatformPricing(body: PatchPlatformPricingDto, actorUserId?: string) {
+  async patchPlatformPricing(
+    body: PatchPlatformPricingDto,
+    actorUserId?: string,
+  ) {
     const existing = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: {
         platformCommissionBps: true,
         commissionWalletMinBroadcastBalanceUzs: true,
         commissionWalletLowBalanceUzs: true,
       },
     });
-    const envBps = this.config.get<number>('PLATFORM_COMMISSION_BPS', 1000);
-    const envMin = this.config.get<number>('COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS', 10_000);
-    const envLow = this.config.get<number>('COMMISSION_WALLET_LOW_BALANCE_UZS', 30_000);
+    const envBps = this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
+    const envMin = this.config.get<number>(
+      "COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS",
+      10_000,
+    );
+    const envLow = this.config.get<number>(
+      "COMMISSION_WALLET_LOW_BALANCE_UZS",
+      30_000,
+    );
 
-    let nextBps = Math.max(0, Math.min(10_000, existing?.platformCommissionBps ?? envBps));
+    let nextBps = Math.max(
+      0,
+      Math.min(10_000, existing?.platformCommissionBps ?? envBps),
+    );
     if (body.platformCommissionBps !== undefined) {
-      nextBps = Math.max(0, Math.min(10_000, Math.trunc(body.platformCommissionBps)));
+      nextBps = Math.max(
+        0,
+        Math.min(10_000, Math.trunc(body.platformCommissionBps)),
+      );
     }
     let nextMin = existing?.commissionWalletMinBroadcastBalanceUzs ?? envMin;
     let nextLow = existing?.commissionWalletLowBalanceUzs ?? envLow;
     if (body.commissionWalletMinBroadcastBalanceUzs !== undefined) {
-      nextMin = Math.max(0, Math.min(50_000_000, Math.trunc(body.commissionWalletMinBroadcastBalanceUzs)));
+      nextMin = Math.max(
+        0,
+        Math.min(
+          50_000_000,
+          Math.trunc(body.commissionWalletMinBroadcastBalanceUzs),
+        ),
+      );
     }
     if (body.commissionWalletLowBalanceUzs !== undefined) {
-      nextLow = Math.max(0, Math.min(50_000_000, Math.trunc(body.commissionWalletLowBalanceUzs)));
+      nextLow = Math.max(
+        0,
+        Math.min(50_000_000, Math.trunc(body.commissionWalletLowBalanceUzs)),
+      );
     }
     if (nextLow < nextMin) {
       throw new BadRequestException(
-        'commissionWalletLowBalanceUzs minimal komissiya talabidan past bo‘lishi mumkin emas',
+        "commissionWalletLowBalanceUzs minimal komissiya talabidan past bo‘lishi mumkin emas",
       );
     }
 
@@ -122,9 +151,9 @@ export class AdminService {
     }
 
     await this.prisma.platformSettings.upsert({
-      where: { id: 'default' },
+      where: { id: "default" },
       create: {
-        id: 'default',
+        id: "default",
         platformCommissionBps: nextBps,
         commissionWalletMinBroadcastBalanceUzs: nextMin,
         commissionWalletLowBalanceUzs: nextLow,
@@ -135,18 +164,24 @@ export class AdminService {
         commissionWalletLowBalanceUzs: nextLow,
       },
     });
-    await this.writeAudit(actorUserId, 'platform.pricing_patch', 'PlatformSettings', null, {
-      platformCommissionBps: nextBps,
-      commissionWalletMinBroadcastBalanceUzs: nextMin,
-      commissionWalletLowBalanceUzs: nextLow,
-      settingsRowId: 'default',
-    });
+    await this.writeAudit(
+      actorUserId,
+      "platform.pricing_patch",
+      "PlatformSettings",
+      null,
+      {
+        platformCommissionBps: nextBps,
+        commissionWalletMinBroadcastBalanceUzs: nextMin,
+        commissionWalletLowBalanceUzs: nextLow,
+        settingsRowId: "default",
+      },
+    );
     return this.platformPricing();
   }
 
   async platformChampionsConfig() {
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: {
         championsSeasonTitleUz: true,
         championsPrizeDescriptionUz: true,
@@ -163,22 +198,31 @@ export class AdminService {
       championsPeriodEndTemplateUz: row?.championsPeriodEndTemplateUz ?? null,
       /** Qo‘llanma */
       templateHint:
-        'Sana uchun `{{DATE}}` yoki `{date}` placeholders — chorak oxiri (YYYY-MM-DD) bilan almashtiriladi.',
+        "Sana uchun `{{DATE}}` yoki `{date}` placeholders — chorak oxiri (YYYY-MM-DD) bilan almashtiriladi.",
     };
   }
 
-  async patchPlatformChampions(body: PatchPlatformChampionsDto, actorUserId?: string) {
+  async patchPlatformChampions(
+    body: PatchPlatformChampionsDto,
+    actorUserId?: string,
+  ) {
     const existing = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: {
         platformCommissionBps: true,
         commissionWalletMinBroadcastBalanceUzs: true,
         commissionWalletLowBalanceUzs: true,
       },
     });
-    const envBps = this.config.get<number>('PLATFORM_COMMISSION_BPS', 1000);
-    const envMin = this.config.get<number>('COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS', 10_000);
-    const envLow = this.config.get<number>('COMMISSION_WALLET_LOW_BALANCE_UZS', 30_000);
+    const envBps = this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
+    const envMin = this.config.get<number>(
+      "COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS",
+      10_000,
+    );
+    const envLow = this.config.get<number>(
+      "COMMISSION_WALLET_LOW_BALANCE_UZS",
+      30_000,
+    );
 
     const touched =
       body.championsSeasonTitleUz !== undefined ||
@@ -197,53 +241,78 @@ export class AdminService {
     };
 
     await this.prisma.platformSettings.upsert({
-      where: { id: 'default' },
+      where: { id: "default" },
       create: {
-        id: 'default',
-        platformCommissionBps: Math.max(0, Math.min(10_000, existing?.platformCommissionBps ?? envBps)),
+        id: "default",
+        platformCommissionBps: Math.max(
+          0,
+          Math.min(10_000, existing?.platformCommissionBps ?? envBps),
+        ),
         commissionWalletMinBroadcastBalanceUzs:
           existing?.commissionWalletMinBroadcastBalanceUzs ?? envMin,
-        commissionWalletLowBalanceUzs: existing?.commissionWalletLowBalanceUzs ?? envLow,
+        commissionWalletLowBalanceUzs:
+          existing?.commissionWalletLowBalanceUzs ?? envLow,
         championsSeasonTitleUz: trimOrNull(body.championsSeasonTitleUz) ?? null,
-        championsPrizeDescriptionUz: trimOrNull(body.championsPrizeDescriptionUz) ?? null,
+        championsPrizeDescriptionUz:
+          trimOrNull(body.championsPrizeDescriptionUz) ?? null,
         championsCadenceHintUz: trimOrNull(body.championsCadenceHintUz) ?? null,
         championsPrizeUsd: body.championsPrizeUsd ?? 100,
-        championsPeriodEndTemplateUz: trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
+        championsPeriodEndTemplateUz:
+          trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
       },
       update: {
         ...(body.championsSeasonTitleUz !== undefined && {
-          championsSeasonTitleUz: trimOrNull(body.championsSeasonTitleUz) ?? null,
+          championsSeasonTitleUz:
+            trimOrNull(body.championsSeasonTitleUz) ?? null,
         }),
         ...(body.championsPrizeDescriptionUz !== undefined && {
-          championsPrizeDescriptionUz: trimOrNull(body.championsPrizeDescriptionUz) ?? null,
+          championsPrizeDescriptionUz:
+            trimOrNull(body.championsPrizeDescriptionUz) ?? null,
         }),
         ...(body.championsCadenceHintUz !== undefined && {
-          championsCadenceHintUz: trimOrNull(body.championsCadenceHintUz) ?? null,
+          championsCadenceHintUz:
+            trimOrNull(body.championsCadenceHintUz) ?? null,
         }),
         ...(body.championsPrizeUsd !== undefined && {
-          championsPrizeUsd: Math.max(0, Math.min(1_000_000, Math.trunc(body.championsPrizeUsd))),
+          championsPrizeUsd: Math.max(
+            0,
+            Math.min(1_000_000, Math.trunc(body.championsPrizeUsd)),
+          ),
         }),
         ...(body.championsPeriodEndTemplateUz !== undefined && {
-          championsPeriodEndTemplateUz: trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
+          championsPeriodEndTemplateUz:
+            trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
         }),
       },
     });
-    await this.writeAudit(actorUserId, 'platform.champions_patch', 'PlatformSettings', null, {
-      patch: body,
-      settingsRowId: 'default',
-    });
+    await this.writeAudit(
+      actorUserId,
+      "platform.champions_patch",
+      "PlatformSettings",
+      null,
+      {
+        patch: body,
+        settingsRowId: "default",
+      },
+    );
     return this.platformChampionsConfig();
   }
 
   securityInfo() {
     return {
-      allowLegacyAuthHeaders: this.config.get<string>('ALLOW_LEGACY_AUTH_HEADERS', 'false') === 'true',
+      allowLegacyAuthHeaders:
+        this.config.get<string>("ALLOW_LEGACY_AUTH_HEADERS", "false") ===
+        "true",
       exchangeSecretConfigured: Boolean(
-        (this.config.get<string>('SALOM_EXCHANGE_SECRET') ?? '').trim().length,
+        (this.config.get<string>("SALOM_EXCHANGE_SECRET") ?? "").trim().length,
       ),
-      smsMode: (this.config.get<string>('SMS_MODE', 'log') || 'log').toLowerCase(),
-      otpLoginEnabled: this.config.get<string>('OTP_LOGIN_ENABLED', 'false') === 'true',
-      driverRegistrationOtp: this.config.get<string>('DRIVER_REGISTRATION_OTP', 'true') === 'true',
+      smsMode: (
+        this.config.get<string>("SMS_MODE", "log") || "log"
+      ).toLowerCase(),
+      otpLoginEnabled:
+        this.config.get<string>("OTP_LOGIN_ENABLED", "false") === "true",
+      driverRegistrationOtp:
+        this.config.get<string>("DRIVER_REGISTRATION_OTP", "true") === "true",
     };
   }
 
@@ -310,8 +379,12 @@ export class AdminService {
     ]);
 
     const gmvUzs = gmvRow._sum.grossUzs ? Number(gmvRow._sum.grossUzs) : 0;
-    const commissionUzs = commissionRow._sum.amountUzs ? Number(commissionRow._sum.amountUzs) : 0;
-    const totalBalanceUzs = balanceSum._sum.balanceUzs ? Number(balanceSum._sum.balanceUzs) : 0;
+    const commissionUzs = commissionRow._sum.amountUzs
+      ? Number(commissionRow._sum.amountUzs)
+      : 0;
+    const totalBalanceUzs = balanceSum._sum.balanceUzs
+      ? Number(balanceSum._sum.balanceUzs)
+      : 0;
     const finished = completedToday + cancelledToday;
     const cancelRate = finished > 0 ? cancelledToday / finished : 0;
 
@@ -354,25 +427,28 @@ export class AdminService {
       const q = params.q.trim();
       andParts.push({
         OR: [
-          { user: { phone: { contains: q, mode: 'insensitive' } } },
-          { vehicles: { some: { plate: { contains: q, mode: 'insensitive' } } } },
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-          { passportOrId: { contains: q, mode: 'insensitive' } },
-          { passportSeries: { contains: q, mode: 'insensitive' } },
-          { passportNumber: { contains: q, mode: 'insensitive' } },
-          { serviceZone: { name: { contains: q, mode: 'insensitive' } } },
-          { serviceZone: { slug: { contains: q, mode: 'insensitive' } } },
+          { user: { phone: { contains: q, mode: "insensitive" } } },
+          {
+            vehicles: { some: { plate: { contains: q, mode: "insensitive" } } },
+          },
+          { firstName: { contains: q, mode: "insensitive" } },
+          { lastName: { contains: q, mode: "insensitive" } },
+          { passportOrId: { contains: q, mode: "insensitive" } },
+          { passportSeries: { contains: q, mode: "insensitive" } },
+          { passportNumber: { contains: q, mode: "insensitive" } },
+          { serviceZone: { name: { contains: q, mode: "insensitive" } } },
+          { serviceZone: { slug: { contains: q, mode: "insensitive" } } },
         ],
       });
     }
-    const where: Prisma.DriverWhereInput = andParts.length > 0 ? { AND: andParts } : {};
+    const where: Prisma.DriverWhereInput =
+      andParts.length > 0 ? { AND: andParts } : {};
     const [rows, total] = await Promise.all([
       this.prisma.driver.findMany({
         where,
         take: params.take,
         skip: params.skip,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
         include: {
           user: { select: { phone: true, status: true } },
           serviceZone: { select: { id: true, name: true, slug: true } },
@@ -422,12 +498,15 @@ export class AdminService {
     actorUserId?: string,
   ) {
     const phone = normalizePhoneUz(body.phone);
-    const existing = await this.prisma.user.findUnique({ where: { phone }, select: { id: true, role: true } });
+    const existing = await this.prisma.user.findUnique({
+      where: { phone },
+      select: { id: true, role: true },
+    });
     if (existing) {
       throw new ConflictException(
         existing.role === UserRole.DRIVER
-          ? 'Ushbu raqam bilan haydovchi allaqachon mavjud'
-          : 'Telefon allaqachon ro‘yxatda',
+          ? "Ushbu raqam bilan haydovchi allaqachon mavjud"
+          : "Telefon allaqachon ro‘yxatda",
       );
     }
 
@@ -438,29 +517,37 @@ export class AdminService {
         select: { id: true, isActive: true },
       });
       if (!zone) {
-        throw new NotFoundException('Zona topilmadi');
+        throw new NotFoundException("Zona topilmadi");
       }
       if (!zone.isActive) {
-        throw new BadRequestException('Nofaol zonaga haydovchi biriktirib bo‘lmaydi');
+        throw new BadRequestException(
+          "Nofaol zonaga haydovchi biriktirib bo‘lmaydi",
+        );
       }
     }
 
     const providedCode = body.activationCode?.trim();
     const activationCode = providedCode || (await this.nextActivationCode());
     if (!/^\d{12}$/.test(activationCode)) {
-      throw new BadRequestException('activationCode 12 ta raqam bo‘lishi kerak');
+      throw new BadRequestException(
+        "activationCode 12 ta raqam bo‘lishi kerak",
+      );
     }
     const codeOwner = await this.prisma.driver.findUnique({
       where: { activationCode },
       select: { id: true },
     });
     if (codeOwner) {
-      throw new ConflictException('Ushbu 12 xonali aktivatsiya kodi allaqachon ishlatilgan');
+      throw new ConflictException(
+        "Ushbu 12 xonali aktivatsiya kodi allaqachon ishlatilgan",
+      );
     }
 
     const balanceUzs = Math.trunc(body.balanceUzs ?? 0);
     if (!Number.isFinite(balanceUzs) || balanceUzs < 0) {
-      throw new BadRequestException('balanceUzs 0 yoki undan katta butun son bo‘lishi kerak');
+      throw new BadRequestException(
+        "balanceUzs 0 yoki undan katta butun son bo‘lishi kerak",
+      );
     }
 
     const firstName = body.firstName?.trim() || null;
@@ -468,7 +555,7 @@ export class AdminService {
     const passportSeries = body.passportSeries?.trim() || null;
     const passportNumber = body.passportNumber?.trim() || null;
     const passportOrIdCombined =
-      [passportSeries, passportNumber].filter(Boolean).join(' ').trim() || null;
+      [passportSeries, passportNumber].filter(Boolean).join(" ").trim() || null;
     const created = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -511,23 +598,41 @@ export class AdminService {
         });
       }
       if (balanceUzs <= 0) {
-        return { user, driver, balanceAfter: driver.balanceUzs, topUpLedgerId: null as string | null };
+        return {
+          user,
+          driver,
+          balanceAfter: driver.balanceUzs,
+          topUpLedgerId: null as string | null,
+        };
       }
       const topUp = await this.ledger.recordTopUp(tx, {
         driverId: driver.id,
         amountUzs: balanceUzs,
-        note: 'Admin initial top-up during driver creation',
+        note: "Admin initial top-up during driver creation",
       });
-      return { user, driver, balanceAfter: topUp.newBalance, topUpLedgerId: topUp.ledgerId };
+      return {
+        user,
+        driver,
+        balanceAfter: topUp.newBalance,
+        topUpLedgerId: topUp.ledgerId,
+      };
     });
 
-    await this.writeAudit(actorUserId, 'driver.admin_create', 'Driver', created.driver.id, {
-      phone,
-      serviceZoneId,
-      balanceUzs,
-      activationCode,
-      ...(created.topUpLedgerId ? { topUpLedgerId: created.topUpLedgerId } : {}),
-    });
+    await this.writeAudit(
+      actorUserId,
+      "driver.admin_create",
+      "Driver",
+      created.driver.id,
+      {
+        phone,
+        serviceZoneId,
+        balanceUzs,
+        activationCode,
+        ...(created.topUpLedgerId
+          ? { topUpLedgerId: created.topUpLedgerId }
+          : {}),
+      },
+    );
 
     return {
       ok: true as const,
@@ -546,13 +651,17 @@ export class AdminService {
 
   private async nextActivationCode(): Promise<string> {
     for (let k = 0; k < 48; k++) {
-      const s = Array.from({ length: 12 }, () => String(randomInt(0, 10))).join('');
-      const hit = await this.prisma.driver.findUnique({ where: { activationCode: s } });
+      const s = Array.from({ length: 12 }, () => String(randomInt(0, 10))).join(
+        "",
+      );
+      const hit = await this.prisma.driver.findUnique({
+        where: { activationCode: s },
+      });
       if (!hit) {
         return s;
       }
     }
-    throw new Error('activation_code');
+    throw new Error("activation_code");
   }
 
   async listPendingDrivers() {
@@ -560,11 +669,14 @@ export class AdminService {
       this.prisma.driver.findMany({
         where: {
           onboardingStatus: {
-            in: [DriverOnboardingStatus.SUBMITTED, DriverOnboardingStatus.UNDER_REVIEW],
+            in: [
+              DriverOnboardingStatus.SUBMITTED,
+              DriverOnboardingStatus.UNDER_REVIEW,
+            ],
           },
         },
         take: 200,
-        orderBy: { submittedAt: 'asc' },
+        orderBy: { submittedAt: "asc" },
         include: {
           user: { select: { phone: true, status: true } },
           serviceZone: { select: { id: true, name: true, slug: true } },
@@ -574,7 +686,10 @@ export class AdminService {
       this.prisma.driver.count({
         where: {
           onboardingStatus: {
-            in: [DriverOnboardingStatus.SUBMITTED, DriverOnboardingStatus.UNDER_REVIEW],
+            in: [
+              DriverOnboardingStatus.SUBMITTED,
+              DriverOnboardingStatus.UNDER_REVIEW,
+            ],
           },
         },
       }),
@@ -605,11 +720,14 @@ export class AdminService {
         where: {
           serviceZoneId,
           onboardingStatus: {
-            in: [DriverOnboardingStatus.SUBMITTED, DriverOnboardingStatus.UNDER_REVIEW],
+            in: [
+              DriverOnboardingStatus.SUBMITTED,
+              DriverOnboardingStatus.UNDER_REVIEW,
+            ],
           },
         },
         take: 200,
-        orderBy: { submittedAt: 'asc' },
+        orderBy: { submittedAt: "asc" },
         include: {
           user: { select: { phone: true, status: true } },
           serviceZone: { select: { id: true, name: true, slug: true } },
@@ -620,7 +738,10 @@ export class AdminService {
         where: {
           serviceZoneId,
           onboardingStatus: {
-            in: [DriverOnboardingStatus.SUBMITTED, DriverOnboardingStatus.UNDER_REVIEW],
+            in: [
+              DriverOnboardingStatus.SUBMITTED,
+              DriverOnboardingStatus.UNDER_REVIEW,
+            ],
           },
         },
       }),
@@ -649,34 +770,64 @@ export class AdminService {
     const d = await this.prisma.driver.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, phone: true, status: true, lastLoginAt: true, createdAt: true } },
+        user: {
+          select: {
+            id: true,
+            phone: true,
+            status: true,
+            lastLoginAt: true,
+            createdAt: true,
+          },
+        },
         serviceZone: true,
-        vehicles: { orderBy: { createdAt: 'desc' } },
-        documents: { orderBy: { createdAt: 'desc' } },
+        vehicles: { orderBy: { createdAt: "desc" } },
+        documents: { orderBy: { createdAt: "desc" } },
         subscriptions: {
           take: 5,
-          orderBy: { endAt: 'desc' },
-          include: { package: true, serviceZone: { select: { name: true, id: true } } },
+          orderBy: { endAt: "desc" },
+          include: {
+            package: true,
+            serviceZone: { select: { name: true, id: true } },
+          },
         },
       },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
-    const [ordersN, tripsN, lastTrips, ledgerTail, financeSummary, reconciliation] = await Promise.all([
+    const [
+      ordersN,
+      tripsN,
+      lastTrips,
+      ledgerTail,
+      financeSummary,
+      reconciliation,
+    ] = await Promise.all([
       this.prisma.order.count({ where: { assignedDriverId: id } }),
       this.prisma.trip.count({ where: { driverId: id } }),
       this.prisma.trip.findMany({
         where: { driverId: id },
         take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: { order: { select: { id: true, status: true, customerPhone: true, pickupLandmark: true } } },
+        orderBy: { createdAt: "desc" },
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+              customerPhone: true,
+              pickupLandmark: true,
+            },
+          },
+        },
       }),
       this.prisma.earningsLedger.findMany({
         where: { driverId: id },
         take: 20,
-        orderBy: { createdAt: 'desc' },
-        include: { order: { select: { id: true, pickupLandmark: true } }, trip: { select: { id: true, status: true } } },
+        orderBy: { createdAt: "desc" },
+        include: {
+          order: { select: { id: true, pickupLandmark: true } },
+          trip: { select: { id: true, status: true } },
+        },
       }),
       this.ledger.getDriverFinanceSummary(id, 30),
       this.ledger.reconcileDriverBalance(id),
@@ -773,13 +924,21 @@ export class AdminService {
     const d = await this.prisma.driver.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, phone: true, status: true, lastLoginAt: true, createdAt: true } },
+        user: {
+          select: {
+            id: true,
+            phone: true,
+            status: true,
+            lastLoginAt: true,
+            createdAt: true,
+          },
+        },
         serviceZone: true,
-        vehicles: { orderBy: { createdAt: 'desc' } },
+        vehicles: { orderBy: { createdAt: "desc" } },
       },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     const [ordersN, tripsN, lastTrips] = await Promise.all([
       this.prisma.order.count({ where: { assignedDriverId: id } }),
@@ -787,7 +946,7 @@ export class AdminService {
       this.prisma.trip.findMany({
         where: { driverId: id },
         take: 5,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         select: {
           id: true,
           status: true,
@@ -842,31 +1001,36 @@ export class AdminService {
       select: { storageKey: true },
     });
     if (!doc) {
-      throw new NotFoundException('Document not found');
+      throw new NotFoundException("Document not found");
     }
-    const root = path.resolve(process.env.DRIVER_DOC_UPLOAD_DIR || path.join(process.cwd(), 'var', 'driver-uploads'));
-    const rel = doc.storageKey.replace(/^[\\/]+/, '');
+    const root = path.resolve(
+      process.env.DRIVER_DOC_UPLOAD_DIR ||
+        path.join(process.cwd(), "var", "driver-uploads"),
+    );
+    const rel = doc.storageKey.replace(/^[\\/]+/, "");
     const full = path.resolve(path.join(root, rel));
     const relative = path.relative(root, full);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new ForbiddenException('Invalid storage path');
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new ForbiddenException("Invalid storage path");
     }
     try {
       await access(full);
     } catch {
-      throw new NotFoundException('Fayl serverda topilmadi (migratsiya yoki disk)');
+      throw new NotFoundException(
+        "Fayl serverda topilmadi (migratsiya yoki disk)",
+      );
     }
     const ext = path.extname(full).toLowerCase();
     const mimeType =
-      ext === '.png'
-        ? 'image/png'
-        : ext === '.webp'
-          ? 'image/webp'
-          : ext === '.gif'
-            ? 'image/gif'
-            : ext === '.heic' || ext === '.heif'
-              ? 'image/heic'
-              : 'image/jpeg';
+      ext === ".png"
+        ? "image/png"
+        : ext === ".webp"
+          ? "image/webp"
+          : ext === ".gif"
+            ? "image/gif"
+            : ext === ".heic" || ext === ".heif"
+              ? "image/heic"
+              : "image/jpeg";
     return { stream: createReadStream(full), mimeType };
   }
 
@@ -883,12 +1047,17 @@ export class AdminService {
         entityType,
         entityId,
         actorId: actorUserId,
-        metadata: (metadata ?? undefined) as object | undefined,
+        metadata: metadata ?? undefined,
       },
     });
   }
 
-  private emitDriverRealtimeNotice(driverId: string, category: DriverNoticeCategory, title: string, body: string) {
+  private emitDriverRealtimeNotice(
+    driverId: string,
+    category: DriverNoticeCategory,
+    title: string,
+    body: string,
+  ) {
     this.driverWs.emitDriverNotice(driverId, {
       v: 1,
       id: randomUUID(),
@@ -899,13 +1068,17 @@ export class AdminService {
     });
   }
 
-  async approveDriver(driverId: string, actorUserId?: string, audit?: { operatorId?: string }) {
+  async approveDriver(
+    driverId: string,
+    actorUserId?: string,
+    audit?: { operatorId?: string },
+  ) {
     const d = await this.prisma.driver.findUnique({
       where: { id: driverId },
       include: { user: { select: { id: true, status: true, phone: true } } },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     if (
       d.onboardingStatus !== DriverOnboardingStatus.SUBMITTED &&
@@ -928,23 +1101,29 @@ export class AdminService {
             }),
           ]);
           const p = d.user.phone.trim();
-          const dial = p.match(/^\+/) ? p : `+${p.replace(/\D/g, '')}`;
+          const dial = p.match(/^\+/) ? p : `+${p.replace(/\D/g, "")}`;
           const smsBody = `Salom Taxi: hisob qayta faollashtirildi. 12 xonali kodingiz: ${code}. Ilovada kiriting.`;
           try {
             await this.sms.sendToCustomer(null, dial, smsBody);
           } catch {
             // kod API javobida qoladi
           }
-          await this.writeAudit(actorUserId, 'driver.reactivate', 'Driver', driverId, {
-            fromStatus: UserAccountStatus.SUSPENDED,
-            toStatus: 'ACTIVE',
-            activationCode: code,
-          });
+          await this.writeAudit(
+            actorUserId,
+            "driver.reactivate",
+            "Driver",
+            driverId,
+            {
+              fromStatus: UserAccountStatus.SUSPENDED,
+              toStatus: "ACTIVE",
+              activationCode: code,
+            },
+          );
           this.emitDriverRealtimeNotice(
             driverId,
-            'account_restored',
-            'Yana chiqish va ishlashingiz mumkin',
-            'Hisobingiz qayta yoqildi. Yangi kod boʻlsa, SMS bilan keladi — ilovada davom etishingiz mumkin.',
+            "account_restored",
+            "Yana chiqish va ishlashingiz mumkin",
+            "Hisobingiz qayta yoqildi. Yangi kod boʻlsa, SMS bilan keladi — ilovada davom etishingiz mumkin.",
           );
           return {
             ok: true as const,
@@ -962,7 +1141,9 @@ export class AdminService {
           activationCode: d.activationCode,
         };
       }
-      throw new BadRequestException("Faqat yuborilgan arizani (SUBMITTED / UNDER_REVIEW) tasdiqlash mumkin");
+      throw new BadRequestException(
+        "Faqat yuborilgan arizani (SUBMITTED / UNDER_REVIEW) tasdiqlash mumkin",
+      );
     }
     const code = await this.nextActivationCode();
     const fromStatus = d.user.status;
@@ -982,38 +1163,50 @@ export class AdminService {
       }),
     ]);
     const p = d.user.phone.trim();
-    const dial = p.match(/^\+/) ? p : `+${p.replace(/\D/g, '')}`;
+    const dial = p.match(/^\+/) ? p : `+${p.replace(/\D/g, "")}`;
     const smsBody = `Salom Taxi: sizning 12 xonali haydovchi kodingiz: ${code}. Iloveda "Faollashtirish" ekranida kiriting.`;
     try {
       await this.sms.sendToCustomer(null, dial, smsBody);
     } catch {
       // SMS provayder xato — kod API javobida qoladi
     }
-    await this.writeAudit(actorUserId, 'driver.approve', 'Driver', driverId, {
+    await this.writeAudit(actorUserId, "driver.approve", "Driver", driverId, {
       fromStatus,
-      toStatus: 'ACTIVE',
+      toStatus: "ACTIVE",
       activationCode: code,
       ...(audit?.operatorId ? { approvedByOperatorId: audit.operatorId } : {}),
     });
     this.emitDriverRealtimeNotice(
       driverId,
-      'application_approved',
-      'Tabriklaymiz, arizangiz tasdiqlandi',
-      'Asosiy tasdiqlash kodingiz yuboriladi. Ilovadagi faollashtirish bo‘limida kodni kiriting va keyin buyurtma olishingiz mumkin.',
+      "application_approved",
+      "Tabriklaymiz, arizangiz tasdiqlandi",
+      "Asosiy tasdiqlash kodingiz yuboriladi. Ilovadagi faollashtirish bo‘limida kodni kiriting va keyin buyurtma olishingiz mumkin.",
     );
-    return { ok: true as const, driverId, userId: d.userId, activationCode: code };
+    return {
+      ok: true as const,
+      driverId,
+      userId: d.userId,
+      activationCode: code,
+    };
   }
 
-  async rejectDriver(driverId: string, reason: string, actorUserId?: string, audit?: { operatorId?: string }) {
+  async rejectDriver(
+    driverId: string,
+    reason: string,
+    actorUserId?: string,
+    audit?: { operatorId?: string },
+  ) {
     const d = await this.prisma.driver.findUnique({
       where: { id: driverId },
       include: { user: { select: { id: true, status: true } } },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     if (d.onboardingStatus === DriverOnboardingStatus.APPROVED) {
-      throw new BadRequestException('Tasdiqlangan haydovchini rad etish: avval to‘xtatish ishlatiladi');
+      throw new BadRequestException(
+        "Tasdiqlangan haydovchini rad etish: avval to‘xtatish ishlatiladi",
+      );
     }
     await this.prisma.driver.update({
       where: { id: driverId },
@@ -1023,7 +1216,7 @@ export class AdminService {
         reviewedAt: new Date(),
       },
     });
-    await this.writeAudit(actorUserId, 'driver.reject', 'Driver', driverId, {
+    await this.writeAudit(actorUserId, "driver.reject", "Driver", driverId, {
       reason: reason.trim(),
       ...(audit?.operatorId ? { rejectedByOperatorId: audit.operatorId } : {}),
     });
@@ -1031,22 +1224,28 @@ export class AdminService {
     const hint = r.length > 200 ? `${r.slice(0, 197)}…` : r;
     this.emitDriverRealtimeNotice(
       driverId,
-      'application_rejected',
-      'Arizangiz hozircha qabul qilinmadi',
+      "application_rejected",
+      "Arizangiz hozircha qabul qilinmadi",
       hint
         ? `Izoh: ${hint}. Keyinroq qayta urinib ko‘rishingiz mumkin.`
-        : 'Keyinroq qayta urinib ko‘rishingiz mumkin yoki qo‘llab-quvvatlashdan yordam so‘rang.',
+        : "Keyinroq qayta urinib ko‘rishingiz mumkin yoki qo‘llab-quvvatlashdan yordam so‘rang.",
     );
     return { ok: true as const, driverId };
   }
 
-  async setDriverUnderReview(driverId: string, actorUserId?: string, audit?: { operatorId?: string }) {
+  async setDriverUnderReview(
+    driverId: string,
+    actorUserId?: string,
+    audit?: { operatorId?: string },
+  ) {
     const d = await this.prisma.driver.findUnique({ where: { id: driverId } });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     if (d.onboardingStatus !== DriverOnboardingStatus.SUBMITTED) {
-      throw new BadRequestException("Faqat YUBORILGAN (SUBMITTED) arizani 'ko'rib chiqilmoqda' qilish mumkin");
+      throw new BadRequestException(
+        "Faqat YUBORILGAN (SUBMITTED) arizani 'ko'rib chiqilmoqda' qilish mumkin",
+      );
     }
     await this.prisma.driver.update({
       where: { id: driverId },
@@ -1055,14 +1254,20 @@ export class AdminService {
         reviewedAt: new Date(),
       },
     });
-    await this.writeAudit(actorUserId, 'driver.under_review', 'Driver', driverId, {
-      ...(audit?.operatorId ? { operatorId: audit.operatorId } : {}),
-    });
+    await this.writeAudit(
+      actorUserId,
+      "driver.under_review",
+      "Driver",
+      driverId,
+      {
+        ...(audit?.operatorId ? { operatorId: audit.operatorId } : {}),
+      },
+    );
     this.emitDriverRealtimeNotice(
       driverId,
-      'application_under_review',
-      'Profilingiz tekshirilmoqda',
-      'Maʼlumotlaringizni tekshiryapmiz. Natija tez orada shu ilova orqali aniq boʻladi — sahifani yangilab turing.',
+      "application_under_review",
+      "Profilingiz tekshirilmoqda",
+      "Maʼlumotlaringizni tekshiryapmiz. Natija tez orada shu ilova orqali aniq boʻladi — sahifani yangilab turing.",
     );
     return { ok: true as const, driverId };
   }
@@ -1073,7 +1278,7 @@ export class AdminService {
       include: { user: { select: { id: true, status: true } } },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     const fromStatus = d.user.status;
     await this.prisma.$transaction([
@@ -1086,15 +1291,15 @@ export class AdminService {
         data: { operationalStatus: DriverOperationalStatus.OFFLINE },
       }),
     ]);
-    await this.writeAudit(actorUserId, 'driver.suspend', 'Driver', driverId, {
+    await this.writeAudit(actorUserId, "driver.suspend", "Driver", driverId, {
       fromStatus,
-      toStatus: 'SUSPENDED',
+      toStatus: "SUSPENDED",
     });
     this.emitDriverRealtimeNotice(
       driverId,
-      'account_suspended',
-      'Hisobingiz vaqtincha toʻxtatildi',
-      'Yangi takliflar va ayrim xizmatlar hozir oʻchiq. Savollar boʻlsa yoki bu xatolik boʻlmasa — qo‘llab-quvvatlash bilan bog‘laning.',
+      "account_suspended",
+      "Hisobingiz vaqtincha toʻxtatildi",
+      "Yangi takliflar va ayrim xizmatlar hozir oʻchiq. Savollar boʻlsa yoki bu xatolik boʻlmasa — qo‘llab-quvvatlash bilan bog‘laning.",
     );
     return { ok: true as const, driverId };
   }
@@ -1114,30 +1319,45 @@ export class AdminService {
       include: { user: { select: { id: true, role: true, phone: true } } },
     });
     if (!d) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     if (d.user.role !== UserRole.DRIVER) {
-      throw new BadRequestException('Faqat DRIVER ro‘lidagi hisobni o‘chirish mumkin');
+      throw new BadRequestException(
+        "Faqat DRIVER ro‘lidagi hisobni o‘chirish mumkin",
+      );
     }
     const blocking = await this.prisma.trip.findFirst({
       where: {
         driverId,
-        status: { in: [TripStatus.NOT_STARTED, TripStatus.ACTIVE, TripStatus.DISPUTED] },
+        status: {
+          in: [TripStatus.NOT_STARTED, TripStatus.ACTIVE, TripStatus.DISPUTED],
+        },
       },
       select: { id: true },
     });
     if (blocking) {
-      throw new ConflictException('Faol yoki nizo ostidagi safar bor — avval operatsion yopish kerak.');
+      throw new ConflictException(
+        "Faol yoki nizo ostidagi safar bor — avval operatsion yopish kerak.",
+      );
     }
     const userId = d.userId;
     const phone = d.user.phone;
 
     const [tripOrders, assignedOrders] = await Promise.all([
-      this.prisma.trip.findMany({ where: { driverId }, select: { orderId: true } }),
-      this.prisma.order.findMany({ where: { assignedDriverId: driverId }, select: { id: true } }),
+      this.prisma.trip.findMany({
+        where: { driverId },
+        select: { orderId: true },
+      }),
+      this.prisma.order.findMany({
+        where: { assignedDriverId: driverId },
+        select: { id: true },
+      }),
     ]);
     const orderIds = [
-      ...new Set([...tripOrders.map((t) => t.orderId), ...assignedOrders.map((o) => o.id)]),
+      ...new Set([
+        ...tripOrders.map((t) => t.orderId),
+        ...assignedOrders.map((o) => o.id),
+      ]),
     ];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1147,7 +1367,7 @@ export class AdminService {
       await tx.user.delete({ where: { id: userId } });
     });
 
-    await this.writeAudit(actorUserId, 'driver.delete', 'User', userId, {
+    await this.writeAudit(actorUserId, "driver.delete", "User", userId, {
       driverId,
       phone,
       ordersPurged: orderIds.length,
@@ -1163,29 +1383,56 @@ export class AdminService {
   ) {
     const data: Prisma.DriverUpdateInput = {};
     if (body.payoutIban !== undefined) {
-      const t = (body.payoutIban ?? '').trim().replace(/\s+/g, '').toUpperCase();
+      const t = (body.payoutIban ?? "")
+        .trim()
+        .replace(/\s+/g, "")
+        .toUpperCase();
       data.payoutIban = t.length ? t : null;
     }
     if (body.payoutAccountName !== undefined) {
-      const t = (body.payoutAccountName ?? '').trim();
+      const t = (body.payoutAccountName ?? "").trim();
       data.payoutAccountName = t.length ? t : null;
     }
     if (Object.keys(data).length === 0) {
-      throw new BadRequestException("Kamida bitta: payoutIban yoki payoutAccountName");
+      throw new BadRequestException(
+        "Kamida bitta: payoutIban yoki payoutAccountName",
+      );
     }
-    const ex = await this.prisma.driver.findUnique({ where: { id: driverId }, select: { id: true } });
+    const ex = await this.prisma.driver.findUnique({
+      where: { id: driverId },
+      select: { id: true },
+    });
     if (!ex) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
-    const d = await this.prisma.driver.update({ where: { id: driverId }, data, select: { id: true, payoutIban: true, payoutAccountName: true } });
-    await this.writeAudit(actorUserId, 'driver.payout_destination', 'Driver', driverId, { ...d });
+    const d = await this.prisma.driver.update({
+      where: { id: driverId },
+      data,
+      select: { id: true, payoutIban: true, payoutAccountName: true },
+    });
+    await this.writeAudit(
+      actorUserId,
+      "driver.payout_destination",
+      "Driver",
+      driverId,
+      { ...d },
+    );
     return d;
   }
 
-  async sendTestSms(toPhone: string, bodyText: string | undefined, actorUserId?: string) {
-    const text = (bodyText?.trim() || 'Salom Taxi: test SMS (admin)').slice(0, 500);
+  async sendTestSms(
+    toPhone: string,
+    bodyText: string | undefined,
+    actorUserId?: string,
+  ) {
+    const text = (bodyText?.trim() || "Salom Taxi: test SMS (admin)").slice(
+      0,
+      500,
+    );
     const { logId } = await this.sms.sendToCustomer(null, toPhone.trim(), text);
-    await this.writeAudit(actorUserId, 'sms.test_send', 'SMSLog', logId, { toPhone: toPhone.trim() });
+    await this.writeAudit(actorUserId, "sms.test_send", "SMSLog", logId, {
+      toPhone: toPhone.trim(),
+    });
     return { ok: true as const, logId };
   }
 
@@ -1201,27 +1448,37 @@ export class AdminService {
     },
     actorUserId?: string,
   ) {
-    const prev = await this.prisma.serviceZone.findUnique({ where: { id: zoneId } });
+    const prev = await this.prisma.serviceZone.findUnique({
+      where: { id: zoneId },
+    });
     if (!prev) {
-      throw new NotFoundException('Zone not found');
+      throw new NotFoundException("Zone not found");
     }
     if (body.clearMeter) {
       await this.prisma.serviceZone.update({
         where: { id: zoneId },
         data: { meterBaseUzs: null, meterPerKmUzs: null },
       });
-      await this.writeAudit(actorUserId, 'zone.meter.clear', 'ServiceZone', zoneId, {
-        before: {
-          meterBaseUzs: prev.meterBaseUzs?.toString() ?? null,
-          meterPerKmUzs: prev.meterPerKmUzs?.toString() ?? null,
+      await this.writeAudit(
+        actorUserId,
+        "zone.meter.clear",
+        "ServiceZone",
+        zoneId,
+        {
+          before: {
+            meterBaseUzs: prev.meterBaseUzs?.toString() ?? null,
+            meterPerKmUzs: prev.meterPerKmUzs?.toString() ?? null,
+          },
         },
-      });
+      );
       return { ok: true as const, zoneId, cleared: true as const };
     }
     const hasM1 = body.meterBaseUzs !== undefined;
     const hasM2 = body.meterPerKmUzs !== undefined;
     if (hasM1 !== hasM2) {
-      throw new BadRequestException('meterBaseUzs va meterPerKmUzs ikkalasi birga yuborilishi kerak');
+      throw new BadRequestException(
+        "meterBaseUzs va meterPerKmUzs ikkalasi birga yuborilishi kerak",
+      );
     }
     const data: Prisma.ServiceZoneUpdateInput = {};
     if (body.starterFeeUzs !== undefined) {
@@ -1241,45 +1498,58 @@ export class AdminService {
       data.meterPerKmUzs = body.meterPerKmUzs;
     }
     if (Object.keys(data).length === 0) {
-      return { ok: true as const, zoneId, message: 'no changes' as const };
+      return { ok: true as const, zoneId, message: "no changes" as const };
     }
-    const updated = await this.prisma.serviceZone.update({ where: { id: zoneId }, data });
-    await this.writeAudit(actorUserId, 'zone.meter.update', 'ServiceZone', zoneId, {
-      before: {
-        starterFeeUzs: prev.starterFeeUzs?.toString() ?? null,
-        waitingFreeMinutes: prev.waitingFreeMinutes ?? null,
-        waitingFeePerMinuteUzs: prev.waitingFeePerMinuteUzs?.toString() ?? null,
-        meterBaseUzs: prev.meterBaseUzs?.toString() ?? null,
-        meterPerKmUzs: prev.meterPerKmUzs?.toString() ?? null,
-      },
-      after: {
-        starterFeeUzs: updated.starterFeeUzs?.toString() ?? null,
-        waitingFreeMinutes: updated.waitingFreeMinutes ?? null,
-        waitingFeePerMinuteUzs: updated.waitingFeePerMinuteUzs?.toString() ?? null,
-        meterBaseUzs: updated.meterBaseUzs?.toString() ?? null,
-        meterPerKmUzs: updated.meterPerKmUzs?.toString() ?? null,
-      },
+    const updated = await this.prisma.serviceZone.update({
+      where: { id: zoneId },
+      data,
     });
+    await this.writeAudit(
+      actorUserId,
+      "zone.meter.update",
+      "ServiceZone",
+      zoneId,
+      {
+        before: {
+          starterFeeUzs: prev.starterFeeUzs?.toString() ?? null,
+          waitingFreeMinutes: prev.waitingFreeMinutes ?? null,
+          waitingFeePerMinuteUzs:
+            prev.waitingFeePerMinuteUzs?.toString() ?? null,
+          meterBaseUzs: prev.meterBaseUzs?.toString() ?? null,
+          meterPerKmUzs: prev.meterPerKmUzs?.toString() ?? null,
+        },
+        after: {
+          starterFeeUzs: updated.starterFeeUzs?.toString() ?? null,
+          waitingFreeMinutes: updated.waitingFreeMinutes ?? null,
+          waitingFeePerMinuteUzs:
+            updated.waitingFeePerMinuteUzs?.toString() ?? null,
+          meterBaseUzs: updated.meterBaseUzs?.toString() ?? null,
+          meterPerKmUzs: updated.meterPerKmUzs?.toString() ?? null,
+        },
+      },
+    );
     return { ok: true as const, zone: updated };
   }
 
   listZones() {
     return this.prisma.serviceZone.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
   async getZonePickupPricing(zoneId: string) {
-    const z = await this.prisma.serviceZone.findUnique({ where: { id: zoneId } });
+    const z = await this.prisma.serviceZone.findUnique({
+      where: { id: zoneId },
+    });
     if (!z) {
-      throw new NotFoundException('Zone not found');
+      throw new NotFoundException("Zone not found");
     }
     const profile = await this.pricingEngine.defaultProfileForZone(zoneId);
     return this.toPickupPricingJson(profile);
   }
 
   private toPickupPricingJson(
-    profile: Awaited<ReturnType<PricingEngineService['defaultProfileForZone']>>,
+    profile: Awaited<ReturnType<PricingEngineService["defaultProfileForZone"]>>,
   ) {
     return {
       profileId: profile.id,
@@ -1295,16 +1565,23 @@ export class AdminService {
         radiusFromKm: Number(r.radiusFromKm),
         radiusToKm: r.radiusToKm == null ? null : Number(r.radiusToKm),
         starterFeeUzs: Number(r.starterFeeUzs),
-        distanceRateUzs: r.distanceRateUzs == null ? null : Number(r.distanceRateUzs),
+        distanceRateUzs:
+          r.distanceRateUzs == null ? null : Number(r.distanceRateUzs),
         sortOrder: r.sortOrder,
       })),
     };
   }
 
-  async patchZonePickupPricing(zoneId: string, dto: PatchZonePickupPricingDto, actorUserId?: string) {
-    const z = await this.prisma.serviceZone.findUnique({ where: { id: zoneId } });
+  async patchZonePickupPricing(
+    zoneId: string,
+    dto: PatchZonePickupPricingDto,
+    actorUserId?: string,
+  ) {
+    const z = await this.prisma.serviceZone.findUnique({
+      where: { id: zoneId },
+    });
     if (!z) {
-      throw new NotFoundException('Zone not found');
+      throw new NotFoundException("Zone not found");
     }
     const profile = await this.pricingEngine.defaultProfileForZone(zoneId);
     const data: Prisma.PricingProfileUpdateInput = {};
@@ -1321,19 +1598,34 @@ export class AdminService {
       data.outsideKmRateUzs = new Prisma.Decimal(dto.outsideKmRateUzs);
     }
     if (Object.keys(data).length > 0) {
-      await this.prisma.pricingProfile.update({ where: { id: profile.id }, data });
-      await this.writeAudit(actorUserId, 'zone.pickup_pricing.patch', 'PricingProfile', profile.id, {
-        zoneId,
-        dto,
+      await this.prisma.pricingProfile.update({
+        where: { id: profile.id },
+        data,
       });
+      await this.writeAudit(
+        actorUserId,
+        "zone.pickup_pricing.patch",
+        "PricingProfile",
+        profile.id,
+        {
+          zoneId,
+          dto,
+        },
+      );
     }
     return this.getZonePickupPricing(zoneId);
   }
 
-  async createPickupPricingRing(zoneId: string, dto: CreatePickupPricingRingDto, actorUserId?: string) {
-    const z = await this.prisma.serviceZone.findUnique({ where: { id: zoneId } });
+  async createPickupPricingRing(
+    zoneId: string,
+    dto: CreatePickupPricingRingDto,
+    actorUserId?: string,
+  ) {
+    const z = await this.prisma.serviceZone.findUnique({
+      where: { id: zoneId },
+    });
     if (!z) {
-      throw new NotFoundException('Zone not found');
+      throw new NotFoundException("Zone not found");
     }
     const profile = await this.pricingEngine.defaultProfileForZone(zoneId);
     const code = dto.code.trim().toLowerCase().slice(0, 40);
@@ -1349,26 +1641,40 @@ export class AdminService {
         code,
         name: dto.name.trim(),
         radiusFromKm: new Prisma.Decimal(dto.radiusFromKm),
-        radiusToKm: dto.radiusToKm == null ? null : new Prisma.Decimal(dto.radiusToKm),
+        radiusToKm:
+          dto.radiusToKm == null ? null : new Prisma.Decimal(dto.radiusToKm),
         starterFeeUzs: new Prisma.Decimal(dto.starterFeeUzs),
-        distanceRateUzs: dto.distanceRateUzs == null ? null : new Prisma.Decimal(dto.distanceRateUzs),
+        distanceRateUzs:
+          dto.distanceRateUzs == null
+            ? null
+            : new Prisma.Decimal(dto.distanceRateUzs),
         sortOrder: dto.sortOrder ?? 100,
       },
     });
-    await this.writeAudit(actorUserId, 'zone.pickup_ring.create', 'PricingRing', ring.id, {
-      zoneId,
-      code,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "zone.pickup_ring.create",
+      "PricingRing",
+      ring.id,
+      {
+        zoneId,
+        code,
+      },
+    );
     return this.getZonePickupPricing(zoneId);
   }
 
-  async patchPickupPricingRing(ringId: string, dto: UpdatePickupPricingRingDto, actorUserId?: string) {
+  async patchPickupPricingRing(
+    ringId: string,
+    dto: UpdatePickupPricingRingDto,
+    actorUserId?: string,
+  ) {
     const ring = await this.prisma.pricingRing.findUnique({
       where: { id: ringId },
       include: { pricingProfile: { select: { serviceZoneId: true } } },
     });
     if (!ring) {
-      throw new NotFoundException('Ring not found');
+      throw new NotFoundException("Ring not found");
     }
     const data: Prisma.PricingRingUpdateInput = {};
     if (dto.name !== undefined) {
@@ -1378,20 +1684,30 @@ export class AdminService {
       data.radiusFromKm = new Prisma.Decimal(dto.radiusFromKm);
     }
     if (dto.radiusToKm !== undefined) {
-      data.radiusToKm = dto.radiusToKm == null ? null : new Prisma.Decimal(dto.radiusToKm);
+      data.radiusToKm =
+        dto.radiusToKm == null ? null : new Prisma.Decimal(dto.radiusToKm);
     }
     if (dto.starterFeeUzs !== undefined) {
       data.starterFeeUzs = new Prisma.Decimal(dto.starterFeeUzs);
     }
     if (dto.distanceRateUzs !== undefined) {
-      data.distanceRateUzs = dto.distanceRateUzs == null ? null : new Prisma.Decimal(dto.distanceRateUzs);
+      data.distanceRateUzs =
+        dto.distanceRateUzs == null
+          ? null
+          : new Prisma.Decimal(dto.distanceRateUzs);
     }
     if (dto.sortOrder !== undefined) {
       data.sortOrder = dto.sortOrder;
     }
     if (Object.keys(data).length > 0) {
       await this.prisma.pricingRing.update({ where: { id: ringId }, data });
-      await this.writeAudit(actorUserId, 'zone.pickup_ring.patch', 'PricingRing', ringId, { dto });
+      await this.writeAudit(
+        actorUserId,
+        "zone.pickup_ring.patch",
+        "PricingRing",
+        ringId,
+        { dto },
+      );
     }
     return this.getZonePickupPricing(ring.pricingProfile.serviceZoneId);
   }
@@ -1399,21 +1715,31 @@ export class AdminService {
   async deletePickupPricingRing(ringId: string, actorUserId?: string) {
     const ring = await this.prisma.pricingRing.findUnique({
       where: { id: ringId },
-      include: { pricingProfile: { select: { serviceZoneId: true, id: true } } },
+      include: {
+        pricingProfile: { select: { serviceZoneId: true, id: true } },
+      },
     });
     if (!ring) {
-      throw new NotFoundException('Ring not found');
+      throw new NotFoundException("Ring not found");
     }
     const count = await this.prisma.pricingRing.count({
       where: { pricingProfileId: ring.pricingProfileId },
     });
     if (count <= 1) {
-      throw new BadRequestException('Kamida bitta pickup radius ring qolishi kerak');
+      throw new BadRequestException(
+        "Kamida bitta pickup radius ring qolishi kerak",
+      );
     }
     await this.prisma.pricingRing.delete({ where: { id: ringId } });
-    await this.writeAudit(actorUserId, 'zone.pickup_ring.delete', 'PricingRing', ringId, {
-      zoneId: ring.pricingProfile.serviceZoneId,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "zone.pickup_ring.delete",
+      "PricingRing",
+      ringId,
+      {
+        zoneId: ring.pricingProfile.serviceZoneId,
+      },
+    );
     return this.getZonePickupPricing(ring.pricingProfile.serviceZoneId);
   }
 
@@ -1439,7 +1765,11 @@ export class AdminService {
       Number.isFinite(body.centerLng);
     const s = slug.toLowerCase();
     const starterDefault =
-      s.includes('far') || s.includes('tash') || s.includes('outer_far') ? 12_000 : s.includes('outer') || s.includes('qishloq') || s.includes('chekka') ? 8_000 : 5_000;
+      s.includes("far") || s.includes("tash") || s.includes("outer_far")
+        ? 12_000
+        : s.includes("outer") || s.includes("qishloq") || s.includes("chekka")
+          ? 8_000
+          : 5_000;
     const row = await this.prisma.serviceZone.create({
       data: {
         name: body.name.trim(),
@@ -1452,7 +1782,7 @@ export class AdminService {
         waitingFeePerMinuteUzs: new Prisma.Decimal(1000),
       },
     });
-    await this.writeAudit(actorUserId, 'zone.create', 'ServiceZone', row.id, {
+    await this.writeAudit(actorUserId, "zone.create", "ServiceZone", row.id, {
       name: row.name,
       slug: row.slug,
     });
@@ -1461,9 +1791,16 @@ export class AdminService {
 
   listOperators() {
     return this.prisma.operator.findMany({
-      orderBy: { displayName: 'asc' },
+      orderBy: { displayName: "asc" },
       include: {
-        user: { select: { phone: true, status: true, createdAt: true, lastLoginAt: true } },
+        user: {
+          select: {
+            phone: true,
+            status: true,
+            createdAt: true,
+            lastLoginAt: true,
+          },
+        },
         serviceZone: { select: { name: true, id: true, slug: true } },
       },
     });
@@ -1481,7 +1818,7 @@ export class AdminService {
   ) {
     const displayName = body.displayName.trim();
     if (!displayName) {
-      throw new BadRequestException('Operator nomi majburiy');
+      throw new BadRequestException("Operator nomi majburiy");
     }
     const phone = normalizePhoneUz(body.phone);
     const serviceZoneId = body.serviceZoneId?.trim() || null;
@@ -1507,12 +1844,19 @@ export class AdminService {
           serviceZoneId,
         },
         include: {
-          user: { select: { phone: true, status: true, createdAt: true, lastLoginAt: true } },
+          user: {
+            select: {
+              phone: true,
+              status: true,
+              createdAt: true,
+              lastLoginAt: true,
+            },
+          },
           serviceZone: { select: { id: true, name: true, slug: true } },
         },
       });
     });
-    await this.writeAudit(actorUserId, 'operator.create', 'Operator', row.id, {
+    await this.writeAudit(actorUserId, "operator.create", "Operator", row.id, {
       phone,
       displayName,
       serviceZoneId,
@@ -1536,13 +1880,14 @@ export class AdminService {
       include: { user: { select: { id: true, phone: true, status: true } } },
     });
     if (!current) {
-      throw new NotFoundException('Operator topilmadi');
+      throw new NotFoundException("Operator topilmadi");
     }
     const opData: Prisma.OperatorUpdateInput = {};
     const userData: Prisma.UserUpdateInput = {};
     if (body.displayName !== undefined) {
       const displayName = body.displayName.trim();
-      if (!displayName) throw new BadRequestException('Operator nomi bo‘sh bo‘lmasin');
+      if (!displayName)
+        throw new BadRequestException("Operator nomi bo‘sh bo‘lmasin");
       opData.displayName = displayName;
     }
     if (body.serviceZoneId !== undefined) {
@@ -1563,25 +1908,45 @@ export class AdminService {
     const pwd = body.password?.trim();
     if (pwd !== undefined) {
       if (pwd.length < 8) {
-        throw new BadRequestException('Parol kamida 8 belgi bo‘lishi kerak');
+        throw new BadRequestException("Parol kamida 8 belgi bo‘lishi kerak");
       }
       userData.passwordHash = await bcrypt.hash(pwd, 10);
     }
     await this.prisma.$transaction([
       ...(Object.keys(userData).length
-        ? [this.prisma.user.update({ where: { id: current.user.id }, data: userData })]
+        ? [
+            this.prisma.user.update({
+              where: { id: current.user.id },
+              data: userData,
+            }),
+          ]
         : []),
       ...(Object.keys(opData).length
-        ? [this.prisma.operator.update({ where: { id: operatorId }, data: opData })]
+        ? [
+            this.prisma.operator.update({
+              where: { id: operatorId },
+              data: opData,
+            }),
+          ]
         : []),
     ]);
-    await this.writeAudit(actorUserId, 'operator.update', 'Operator', operatorId, {
-      fields: Object.keys(body).filter((k) => k !== 'password'),
-    });
+    await this.writeAudit(
+      actorUserId,
+      "operator.update",
+      "Operator",
+      operatorId,
+      {
+        fields: Object.keys(body).filter((k) => k !== "password"),
+      },
+    );
     return this.getOperator(operatorId);
   }
 
-  setOperatorStatus(operatorId: string, status: UserAccountStatus, actorUserId?: string) {
+  setOperatorStatus(
+    operatorId: string,
+    status: UserAccountStatus,
+    actorUserId?: string,
+  ) {
     return this.updateOperator(operatorId, { status }, actorUserId);
   }
 
@@ -1591,13 +1956,15 @@ export class AdminService {
       include: { user: { select: { id: true, phone: true, role: true } } },
     });
     if (!op) {
-      throw new NotFoundException('Operator topilmadi');
+      throw new NotFoundException("Operator topilmadi");
     }
     if (op.user.role !== UserRole.OPERATOR) {
-      throw new BadRequestException('Faqat OPERATOR ro‘lidagi hisobni o‘chirish mumkin');
+      throw new BadRequestException(
+        "Faqat OPERATOR ro‘lidagi hisobni o‘chirish mumkin",
+      );
     }
     await this.prisma.user.delete({ where: { id: op.userId } });
-    await this.writeAudit(actorUserId, 'operator.delete', 'User', op.userId, {
+    await this.writeAudit(actorUserId, "operator.delete", "User", op.userId, {
       operatorId,
       phone: op.user.phone,
     });
@@ -1608,7 +1975,14 @@ export class AdminService {
     return this.prisma.operator.findUniqueOrThrow({
       where: { id: operatorId },
       include: {
-        user: { select: { phone: true, status: true, createdAt: true, lastLoginAt: true } },
+        user: {
+          select: {
+            phone: true,
+            status: true,
+            createdAt: true,
+            lastLoginAt: true,
+          },
+        },
         serviceZone: { select: { id: true, name: true, slug: true } },
       },
     });
@@ -1620,7 +1994,7 @@ export class AdminService {
       select: { id: true },
     });
     if (!z) {
-      throw new BadRequestException('Xizmat zonasi topilmadi yoki faol emas');
+      throw new BadRequestException("Xizmat zonasi topilmadi yoki faol emas");
     }
   }
 
@@ -1640,12 +2014,12 @@ export class AdminService {
       select: { id: true, serviceZoneId: true },
     });
     if (!driver) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     const plate = body.plate.trim();
     const makeModel = body.makeModel.trim();
     if (!plate || !makeModel) {
-      throw new BadRequestException('plate va makeModel majburiy');
+      throw new BadRequestException("plate va makeModel majburiy");
     }
     const row = await this.prisma.vehicle.create({
       data: {
@@ -1659,7 +2033,13 @@ export class AdminService {
         isActive: true,
       },
     });
-    await this.writeAudit(actorUserId, 'vehicle.admin_create', 'Vehicle', row.id, { driverId });
+    await this.writeAudit(
+      actorUserId,
+      "vehicle.admin_create",
+      "Vehicle",
+      row.id,
+      { driverId },
+    );
     return row;
   }
 
@@ -1680,7 +2060,7 @@ export class AdminService {
       where: { id: vehicleId, driverId },
     });
     if (!existing) {
-      throw new NotFoundException('Vehicle not found');
+      throw new NotFoundException("Vehicle not found");
     }
     const data: Prisma.VehicleUpdateInput = {};
     if (body.plate !== undefined) {
@@ -1705,19 +2085,35 @@ export class AdminService {
       where: { id: vehicleId },
       data,
     });
-    await this.writeAudit(actorUserId, 'vehicle.admin_update', 'Vehicle', vehicleId, { driverId });
+    await this.writeAudit(
+      actorUserId,
+      "vehicle.admin_update",
+      "Vehicle",
+      vehicleId,
+      { driverId },
+    );
     return row;
   }
 
-  async removeDriverVehicle(driverId: string, vehicleId: string, actorUserId?: string) {
+  async removeDriverVehicle(
+    driverId: string,
+    vehicleId: string,
+    actorUserId?: string,
+  ) {
     const r = await this.prisma.vehicle.updateMany({
       where: { id: vehicleId, driverId },
       data: { isActive: false },
     });
     if (r.count === 0) {
-      throw new NotFoundException('Vehicle not found');
+      throw new NotFoundException("Vehicle not found");
     }
-    await this.writeAudit(actorUserId, 'vehicle.admin_remove', 'Vehicle', vehicleId, { driverId });
+    await this.writeAudit(
+      actorUserId,
+      "vehicle.admin_remove",
+      "Vehicle",
+      vehicleId,
+      { driverId },
+    );
     return { ok: true as const };
   }
 
@@ -1726,8 +2122,8 @@ export class AdminService {
     if (params.q?.trim()) {
       const q = params.q.trim();
       where.OR = [
-        { plate: { contains: q, mode: 'insensitive' } },
-        { makeModel: { contains: q, mode: 'insensitive' } },
+        { plate: { contains: q, mode: "insensitive" } },
+        { makeModel: { contains: q, mode: "insensitive" } },
       ];
     }
     return this.prisma.$transaction([
@@ -1735,7 +2131,7 @@ export class AdminService {
         where,
         take: params.take,
         skip: params.skip,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
         include: {
           driver: {
             include: { user: { select: { phone: true } } },
@@ -1750,7 +2146,7 @@ export class AdminService {
   listSubscriptionPackages() {
     return this.prisma.subscriptionPackage.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -1759,7 +2155,7 @@ export class AdminService {
       this.prisma.driverSubscription.findMany({
         take: params.take,
         skip: params.skip,
-        orderBy: { endAt: 'desc' },
+        orderBy: { endAt: "desc" },
         include: {
           package: true,
           driver: { include: { user: { select: { phone: true } } } },
@@ -1793,10 +2189,12 @@ export class AdminService {
     ]);
     return {
       windowDays: 30,
-      earningsNetSum30dUzs: earn30._sum.amountUzs?.toString() ?? '0',
-      commissionSum30dUzs: comm30._sum.amountUzs?.toString() ?? '0',
-      payoutSum30dUzs: payOut._sum.amountUzs ? Number(payOut._sum.amountUzs) : 0,
-      totalDriverBalanceUzs: drivers._sum.balanceUzs?.toString() ?? '0',
+      earningsNetSum30dUzs: earn30._sum.amountUzs?.toString() ?? "0",
+      commissionSum30dUzs: comm30._sum.amountUzs?.toString() ?? "0",
+      payoutSum30dUzs: payOut._sum.amountUzs
+        ? Number(payOut._sum.amountUzs)
+        : 0,
+      totalDriverBalanceUzs: drivers._sum.balanceUzs?.toString() ?? "0",
     };
   }
 
@@ -1806,10 +2204,10 @@ export class AdminService {
       take: Math.min(take, 200),
       where: ac
         ? {
-            action: { contains: ac, mode: 'insensitive' as const },
+            action: { contains: ac, mode: "insensitive" as const },
           }
         : undefined,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: { actor: { select: { phone: true, role: true } } },
     });
   }
@@ -1818,7 +2216,7 @@ export class AdminService {
     return this.prisma.earningsLedger.findMany({
       where: { type: EarningsLedgerType.PAYOUT },
       take: Math.min(take, 100),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         driver: { include: { user: { select: { phone: true } } } },
       },
@@ -1828,7 +2226,7 @@ export class AdminService {
   listTopDriverBalances(take: number) {
     return this.prisma.driver.findMany({
       take: Math.min(take, 50),
-      orderBy: { balanceUzs: 'desc' },
+      orderBy: { balanceUzs: "desc" },
       include: { user: { select: { phone: true, status: true } } },
     });
   }
@@ -1863,8 +2261,8 @@ export class AdminService {
     if (params.q?.trim()) {
       const q = params.q.trim();
       where.OR = [
-        { note: { contains: q, mode: 'insensitive' } },
-        { driver: { user: { phone: { contains: q, mode: 'insensitive' } } } },
+        { note: { contains: q, mode: "insensitive" } },
+        { driver: { user: { phone: { contains: q, mode: "insensitive" } } } },
       ];
     }
     return where;
@@ -1887,7 +2285,7 @@ export class AdminService {
         where,
         take,
         skip,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           driver: {
             select: {
@@ -1898,8 +2296,23 @@ export class AdminService {
               user: { select: { phone: true, status: true } },
             },
           },
-          order: { select: { id: true, pickupLandmark: true, customerPhone: true, status: true } },
-          trip: { select: { id: true, status: true, endedAt: true, grossUzs: true, commissionUzs: true } },
+          order: {
+            select: {
+              id: true,
+              pickupLandmark: true,
+              customerPhone: true,
+              status: true,
+            },
+          },
+          trip: {
+            select: {
+              id: true,
+              status: true,
+              endedAt: true,
+              grossUzs: true,
+              commissionUzs: true,
+            },
+          },
         },
       }),
       this.prisma.earningsLedger.count({ where }),
@@ -1958,9 +2371,14 @@ export class AdminService {
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
       const [created, completed, gmv, commission] = await Promise.all([
-        this.prisma.order.count({ where: { createdAt: { gte: start, lt: end } } }),
         this.prisma.order.count({
-          where: { status: OrderStatus.COMPLETED, updatedAt: { gte: start, lt: end } },
+          where: { createdAt: { gte: start, lt: end } },
+        }),
+        this.prisma.order.count({
+          where: {
+            status: OrderStatus.COMPLETED,
+            updatedAt: { gte: start, lt: end },
+          },
         }),
         this.prisma.trip.aggregate({
           where: {
@@ -1980,7 +2398,9 @@ export class AdminService {
         created,
         completed,
         gmvUzs: gmv._sum.grossUzs ? Number(gmv._sum.grossUzs) : 0,
-        commissionUzs: commission._sum.amountUzs ? Number(commission._sum.amountUzs) : 0,
+        commissionUzs: commission._sum.amountUzs
+          ? Number(commission._sum.amountUzs)
+          : 0,
       });
     }
     return { days: d, series: out };
@@ -1998,7 +2418,7 @@ export class AdminService {
         },
       },
       take: Math.min(take, 100),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         driver: { include: { user: { select: { phone: true } } } },
       },
@@ -2009,7 +2429,7 @@ export class AdminService {
     return this.prisma.earningsLedger.findMany({
       where: { type: EarningsLedgerType.TOP_UP },
       take: Math.min(take, 100),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         driver: { include: { user: { select: { phone: true } } } },
       },
@@ -2024,7 +2444,7 @@ export class AdminService {
     return this.prisma.sMSLog.findMany({
       take: Math.min(take, 200),
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: { order: { select: { id: true, status: true } } },
     });
   }
@@ -2033,14 +2453,24 @@ export class AdminService {
     body: { driverId: string; amountUzs: number; note?: string },
     actorUserId?: string,
   ) {
-    const mutation = await this.prisma.$transaction((tx) => this.ledger.recordPayout(tx, body));
-    await this.writeAudit(actorUserId, 'finance.payout', 'Driver', body.driverId, {
-      amountUzs: body.amountUzs,
-      ledgerId: mutation.ledgerId,
-      previousBalanceUzs: mutation.previousBalance.toString(),
-      newBalanceUzs: mutation.newBalance.toString(),
+    const mutation = await this.prisma.$transaction((tx) =>
+      this.ledger.recordPayout(tx, body),
+    );
+    await this.writeAudit(
+      actorUserId,
+      "finance.payout",
+      "Driver",
+      body.driverId,
+      {
+        amountUzs: body.amountUzs,
+        ledgerId: mutation.ledgerId,
+        previousBalanceUzs: mutation.previousBalance.toString(),
+        newBalanceUzs: mutation.newBalance.toString(),
+      },
+    );
+    const row = await this.prisma.earningsLedger.findUnique({
+      where: { id: mutation.ledgerId },
     });
-    const row = await this.prisma.earningsLedger.findUnique({ where: { id: mutation.ledgerId } });
     return { ok: true as const, ledger: row };
   }
 
@@ -2048,14 +2478,24 @@ export class AdminService {
     body: { driverId: string; amountUzs: number; note?: string },
     actorUserId?: string,
   ) {
-    const mutation = await this.prisma.$transaction((tx) => this.ledger.recordTopUp(tx, body));
-    await this.writeAudit(actorUserId, 'finance.top_up', 'Driver', body.driverId, {
-      amountUzs: body.amountUzs,
-      ledgerId: mutation.ledgerId,
-      previousBalanceUzs: mutation.previousBalance.toString(),
-      newBalanceUzs: mutation.newBalance.toString(),
+    const mutation = await this.prisma.$transaction((tx) =>
+      this.ledger.recordTopUp(tx, body),
+    );
+    await this.writeAudit(
+      actorUserId,
+      "finance.top_up",
+      "Driver",
+      body.driverId,
+      {
+        amountUzs: body.amountUzs,
+        ledgerId: mutation.ledgerId,
+        previousBalanceUzs: mutation.previousBalance.toString(),
+        newBalanceUzs: mutation.newBalance.toString(),
+      },
+    );
+    const row = await this.prisma.earningsLedger.findUnique({
+      where: { id: mutation.ledgerId },
     });
-    const row = await this.prisma.earningsLedger.findUnique({ where: { id: mutation.ledgerId } });
     return { ok: true as const, ledger: row };
   }
 
@@ -2063,20 +2503,30 @@ export class AdminService {
     body: { driverId: string; amountUzs: number; note?: string },
     actorUserId?: string,
   ) {
-    const mutation = await this.prisma.$transaction((tx) => this.ledger.recordManualAdjustment(tx, body));
-    await this.writeAudit(actorUserId, 'finance.adjustment', 'Driver', body.driverId, {
-      amountUzs: body.amountUzs,
-      type: mutation.type,
-      ledgerId: mutation.ledgerId,
-      previousBalanceUzs: mutation.previousBalance.toString(),
-      newBalanceUzs: mutation.newBalance.toString(),
+    const mutation = await this.prisma.$transaction((tx) =>
+      this.ledger.recordManualAdjustment(tx, body),
+    );
+    await this.writeAudit(
+      actorUserId,
+      "finance.adjustment",
+      "Driver",
+      body.driverId,
+      {
+        amountUzs: body.amountUzs,
+        type: mutation.type,
+        ledgerId: mutation.ledgerId,
+        previousBalanceUzs: mutation.previousBalance.toString(),
+        newBalanceUzs: mutation.newBalance.toString(),
+      },
+    );
+    const row = await this.prisma.earningsLedger.findUnique({
+      where: { id: mutation.ledgerId },
     });
-    const row = await this.prisma.earningsLedger.findUnique({ where: { id: mutation.ledgerId } });
     return { ok: true as const, ledger: row };
   }
 
   listSmsTemplates() {
-    return this.prisma.smsTemplate.findMany({ orderBy: { code: 'asc' } });
+    return this.prisma.smsTemplate.findMany({ orderBy: { code: "asc" } });
   }
 
   async updateSmsTemplate(
@@ -2086,14 +2536,16 @@ export class AdminService {
   ) {
     const c = code.trim();
     if (!c) {
-      throw new BadRequestException('code');
+      throw new BadRequestException("code");
     }
-    const cur = await this.prisma.smsTemplate.findUnique({ where: { code: c } });
+    const cur = await this.prisma.smsTemplate.findUnique({
+      where: { code: c },
+    });
     if (!cur) {
-      throw new NotFoundException('Shablon topilmadi');
+      throw new NotFoundException("Shablon topilmadi");
     }
     if (body.bodyUz === undefined && body.isActive === undefined) {
-      throw new BadRequestException('bodyUz yoki isActive bering');
+      throw new BadRequestException("bodyUz yoki isActive bering");
     }
     const data: Prisma.SmsTemplateUpdateInput = {};
     if (body.bodyUz !== undefined) {
@@ -2106,25 +2558,31 @@ export class AdminService {
       where: { code: c },
       data,
     });
-    await this.writeAudit(actorUserId, 'sms_template.update', 'SmsTemplate', updated.id, { code: c });
+    await this.writeAudit(
+      actorUserId,
+      "sms_template.update",
+      "SmsTemplate",
+      updated.id,
+      { code: c },
+    );
     return updated;
   }
 
   /** Kunlik ro'yxat (UTC kunlar) — buyurtmalar + GMV + komissiya. */
   async exportDailyOrderStatsCsv(days: number): Promise<string> {
     const d = await this.dailyOrderStats(days);
-    const header = 'date,ordersCreated,ordersCompleted,gmvUzs,commissionUzs\n';
+    const header = "date,ordersCreated,ordersCompleted,gmvUzs,commissionUzs\n";
     const lines = d.series.map((r) =>
-      [r.date, r.created, r.completed, r.gmvUzs, r.commissionUzs].join(','),
+      [r.date, r.created, r.completed, r.gmvUzs, r.commissionUzs].join(","),
     );
-    return header + lines.join('\n') + '\n';
+    return header + lines.join("\n") + "\n";
   }
 
   async exportPilotReportCsv(days: number): Promise<string> {
     const p = await this.pilotOpsReport(days);
     const lines: string[] = [];
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
-    lines.push('section,type,key,value');
+    lines.push("section,type,key,value");
     const w = p.window;
     lines.push(
       `summary,window,fromUtc,${esc(w.fromUtc)}`,
@@ -2141,7 +2599,9 @@ export class AdminService {
       lines.push(`cancel,reason,${esc(c.label)},${c.count}`);
     }
     for (const z of p.zoneStats) {
-      lines.push(`zone,${esc(z.name)},${esc(String(z.serviceZoneId ?? ''))},${z.orders}`);
+      lines.push(
+        `zone,${esc(z.name)},${esc(String(z.serviceZoneId ?? ""))},${z.orders}`,
+      );
     }
     for (const d of p.driverPerformance) {
       lines.push(
@@ -2151,7 +2611,7 @@ export class AdminService {
     for (const [i, c] of p.pilotChecklist.entries()) {
       lines.push(`checklist,item${i + 1},,${esc(c)}`);
     }
-    return lines.join('\n') + '\n';
+    return lines.join("\n") + "\n";
   }
 
   /** CSV: PAYOUT + ADJUSTMENT + TRIP_EARNINGS (bank / buxgalteriya eksporti). */
@@ -2168,25 +2628,33 @@ export class AdminService {
     const rows = await this.prisma.earningsLedger.findMany({
       where,
       take: n,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         driver: { include: { user: { select: { phone: true } } } },
       },
     });
     const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const header = ['id', 'createdAtUtc', 'type', 'amountUzs', 'balanceAfterUzs', 'driverPhone', 'note'].join(',');
+    const header = [
+      "id",
+      "createdAtUtc",
+      "type",
+      "amountUzs",
+      "balanceAfterUzs",
+      "driverPhone",
+      "note",
+    ].join(",");
     const lines = rows.map((r) =>
       [
         esc(r.id),
         esc(r.createdAt.toISOString()),
         esc(r.type),
         esc(r.amountUzs.toString()),
-        esc(r.balanceAfterUzs?.toString() ?? ''),
+        esc(r.balanceAfterUzs?.toString() ?? ""),
         esc(r.driver.user.phone),
-        esc((r.note ?? '').replace(/\r?\n/g, ' ')),
-      ].join(','),
+        esc((r.note ?? "").replace(/\r?\n/g, " ")),
+      ].join(","),
     );
-    return `${header}\n${lines.join('\n')}\n`;
+    return `${header}\n${lines.join("\n")}\n`;
   }
 
   /**
@@ -2198,21 +2666,23 @@ export class AdminService {
     const rows = await this.prisma.earningsLedger.findMany({
       where: { type: EarningsLedgerType.PAYOUT },
       take: n,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
-        driver: { select: { payoutIban: true, user: { select: { phone: true } } } },
+        driver: {
+          select: { payoutIban: true, user: { select: { phone: true } } },
+        },
       },
     });
     const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
     const header = [
-      'createdAtUtc',
-      'amountUzs',
-      'driverPhone',
-      'driverId',
-      'ledgerId',
-      'payoutIban',
-      'note',
-    ].join(',');
+      "createdAtUtc",
+      "amountUzs",
+      "driverPhone",
+      "driverId",
+      "ledgerId",
+      "payoutIban",
+      "note",
+    ].join(",");
     const lines = rows.map((r) =>
       [
         esc(r.createdAt.toISOString()),
@@ -2220,11 +2690,11 @@ export class AdminService {
         esc(r.driver.user.phone),
         esc(r.driverId),
         esc(r.id),
-        esc(r.driver.payoutIban?.trim() ?? ''),
-        esc((r.note ?? '').replace(/\r?\n/g, ' ')),
-      ].join(','),
+        esc(r.driver.payoutIban?.trim() ?? ""),
+        esc((r.note ?? "").replace(/\r?\n/g, " ")),
+      ].join(","),
     );
-    return `${header}\n${lines.join('\n')}\n`;
+    return `${header}\n${lines.join("\n")}\n`;
   }
 
   /** Pilot / launch: KPIlar, zonalar, bekor sabablari, haydovchi statistikasi. */
@@ -2242,7 +2712,9 @@ export class AdminService {
       OrderStatus.EXPIRED,
     ];
 
-    const createdN = await this.prisma.order.count({ where: { createdAt: { gte: from } } });
+    const createdN = await this.prisma.order.count({
+      where: { createdAt: { gte: from } },
+    });
     const completedN = await this.prisma.order.count({
       where: { status: OrderStatus.COMPLETED, updatedAt: { gte: from } },
     });
@@ -2250,7 +2722,11 @@ export class AdminService {
       where: { status: { in: cancelStatuses }, updatedAt: { gte: from } },
     });
     const gmv = await this.prisma.trip.aggregate({
-      where: { status: TripStatus.COMPLETED, endedAt: { gte: from }, grossUzs: { not: null } },
+      where: {
+        status: TripStatus.COMPLETED,
+        endedAt: { gte: from },
+        grossUzs: { not: null },
+      },
       _sum: { grossUzs: true },
     });
     const commission = await this.prisma.commissionLedger.aggregate({
@@ -2258,7 +2734,7 @@ export class AdminService {
       _sum: { amountUzs: true },
     });
     const reasonGroups = await this.prisma.order.groupBy({
-      by: ['cancellationReasonId'],
+      by: ["cancellationReasonId"],
       where: {
         status: { in: cancelStatuses },
         updatedAt: { gte: from },
@@ -2266,32 +2742,39 @@ export class AdminService {
       _count: { _all: true },
     });
     const zoneGroups = await this.prisma.order.groupBy({
-      by: ['serviceZoneId'],
+      by: ["serviceZoneId"],
       where: { createdAt: { gte: from } },
       _count: { _all: true },
     });
     const topTrips = await this.prisma.trip.groupBy({
-      by: ['driverId'],
+      by: ["driverId"],
       where: { status: TripStatus.COMPLETED, endedAt: { gte: from } },
       _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
+      orderBy: { _count: { id: "desc" } },
       take: 12,
     });
 
     const finished = completedN + cancelledN;
-    const completionRate = finished > 0 ? Math.round((completedN / finished) * 1000) / 1000 : 0;
-    const reasonIds = reasonGroups.map((g) => g.cancellationReasonId).filter((x): x is string => x != null);
+    const completionRate =
+      finished > 0 ? Math.round((completedN / finished) * 1000) / 1000 : 0;
+    const reasonIds = reasonGroups
+      .map((g) => g.cancellationReasonId)
+      .filter((x): x is string => x != null);
     const reasonLabels = await this.prisma.cancellationReason.findMany({
       where: { id: { in: reasonIds } },
     });
     const labelById = new Map(reasonLabels.map((r) => [r.id, r.labelUz]));
     const cancelReasons = reasonGroups.map((g) => ({
       reasonId: g.cancellationReasonId,
-      label: g.cancellationReasonId ? labelById.get(g.cancellationReasonId) ?? '—' : '(sabab kiritilmagan)',
+      label: g.cancellationReasonId
+        ? (labelById.get(g.cancellationReasonId) ?? "—")
+        : "(sabab kiritilmagan)",
       count: g._count._all,
     }));
 
-    const zoneIds = zoneGroups.map((g) => g.serviceZoneId).filter((x): x is string => x != null);
+    const zoneIds = zoneGroups
+      .map((g) => g.serviceZoneId)
+      .filter((x): x is string => x != null);
     const zones = await this.prisma.serviceZone.findMany({
       where: { id: { in: zoneIds } },
       select: { id: true, name: true },
@@ -2299,7 +2782,9 @@ export class AdminService {
     const zoneName = new Map(zones.map((z) => [z.id, z.name]));
     const zoneStats = zoneGroups.map((g) => ({
       serviceZoneId: g.serviceZoneId,
-      name: g.serviceZoneId ? zoneName.get(g.serviceZoneId) ?? g.serviceZoneId : '(zona yo‘q)',
+      name: g.serviceZoneId
+        ? (zoneName.get(g.serviceZoneId) ?? g.serviceZoneId)
+        : "(zona yo‘q)",
       orders: g._count._all,
     }));
 
@@ -2311,12 +2796,14 @@ export class AdminService {
     const phoneByDriver = new Map(drivers.map((d) => [d.id, d.user.phone]));
     const driverTop = topTrips.map((t) => ({
       driverId: t.driverId,
-      phone: phoneByDriver.get(t.driverId) ?? '—',
+      phone: phoneByDriver.get(t.driverId) ?? "—",
       tripsCompleted: t._count.id,
     }));
 
     const gmvUzs = gmv._sum.grossUzs ? Number(gmv._sum.grossUzs) : 0;
-    const commissionUzs = commission._sum.amountUzs ? Number(commission._sum.amountUzs) : 0;
+    const commissionUzs = commission._sum.amountUzs
+      ? Number(commission._sum.amountUzs)
+      : 0;
 
     const orderFinanceByDay = (await this.dailyOrderStats(d)).series;
 
@@ -2333,10 +2820,10 @@ export class AdminService {
       driverPerformance: driverTop,
       orderFinanceByDay,
       pilotChecklist: [
-        'ALLOW_LEGACY_AUTH_HEADERS=false — barcha klientlarda Bearer tekshirilgan',
-        'Operator JWT + haydovchi exchange real qurilmada',
-        'SMS_MODE=http yoki provayder webhook',
-        'Payout + CSV eksport (moliya)',
+        "ALLOW_LEGACY_AUTH_HEADERS=false — barcha klientlarda Bearer tekshirilgan",
+        "Operator JWT + haydovchi exchange real qurilmada",
+        "SMS_MODE=http yoki provayder webhook",
+        "Payout + CSV eksport (moliya)",
       ],
     };
   }
@@ -2347,12 +2834,12 @@ export class AdminService {
   async commissionMonthlyByPeriod(periodYm: string) {
     const re = /^(\d{4})-(\d{2})$/.exec(periodYm.trim());
     if (!re) {
-      throw new BadRequestException('periodYm: YYYY-MM (mas. 2026-04)');
+      throw new BadRequestException("periodYm: YYYY-MM (mas. 2026-04)");
     }
     const y = parseInt(re[1], 10);
     const mo = parseInt(re[2], 10) - 1;
     if (mo < 0 || mo > 11) {
-      throw new BadRequestException('Oy 01–12');
+      throw new BadRequestException("Oy 01–12");
     }
     const from = new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0));
     const to = new Date(Date.UTC(y, mo + 1, 1, 0, 0, 0, 0));
@@ -2366,7 +2853,10 @@ export class AdminService {
         driver: { include: { user: { select: { phone: true } } } },
       },
     });
-    const map = new Map<string, { commissionUzs: number; tripCount: number; phone: string }>();
+    const map = new Map<
+      string,
+      { commissionUzs: number; tripCount: number; phone: string }
+    >();
     for (const t of trips) {
       const cur = map.get(t.driverId) ?? {
         commissionUzs: 0,
@@ -2379,7 +2869,10 @@ export class AdminService {
       cur.tripCount += 1;
       map.set(t.driverId, cur);
     }
-    const totalCommissionUzs = [...map.values()].reduce((a, b) => a + b.commissionUzs, 0);
+    const totalCommissionUzs = [...map.values()].reduce(
+      (a, b) => a + b.commissionUzs,
+      0,
+    );
     return {
       periodYm: `${re[1]}-${re[2]}`,
       fromUtc: from.toISOString(),
@@ -2415,10 +2908,16 @@ export class AdminService {
         },
       });
     }
-    await this.writeAudit(actorUserId, 'finance.settlement.sync', 'Month', null, {
-      periodYm: r.periodYm,
-      drivers: r.items.length,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "finance.settlement.sync",
+      "Month",
+      null,
+      {
+        periodYm: r.periodYm,
+        drivers: r.items.length,
+      },
+    );
     return { ok: true as const, periodYm: r.periodYm, updated: r.items.length };
   }
 
@@ -2434,15 +2933,19 @@ export class AdminService {
     // Base snapshot: current real stats in that month. Later trips/cancels are applied on top of override.
     const m = /^(\d{4})-(\d{2})$/.exec(periodYm);
     if (!m) {
-      throw new BadRequestException('periodYm: YYYY-MM');
+      throw new BadRequestException("periodYm: YYYY-MM");
     }
-    const y = parseInt(m[1]!, 10);
-    const mo = parseInt(m[2]!, 10) - 1;
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10) - 1;
     const from = new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0));
     const to = new Date(Date.UTC(y, mo + 1, 1, 0, 0, 0, 0));
     const [baseTrips, baseCancels] = await Promise.all([
       this.prisma.trip.count({
-        where: { driverId, status: TripStatus.COMPLETED, endedAt: { gte: from, lt: to } },
+        where: {
+          driverId,
+          status: TripStatus.COMPLETED,
+          endedAt: { gte: from, lt: to },
+        },
       }),
       this.prisma.order.count({
         where: {
@@ -2471,64 +2974,94 @@ export class AdminService {
         baseCancels,
         updatedByUserId: actorUserId ?? null,
       },
-      select: { id: true, driverId: true, periodYm: true, score: true, trips: true, updatedAt: true },
+      select: {
+        id: true,
+        driverId: true,
+        periodYm: true,
+        score: true,
+        trips: true,
+        updatedAt: true,
+      },
     });
 
-    await this.writeAudit(actorUserId, 'gamification.leaderboard_override', 'DriverLeaderboardOverride', row.id, {
-      driverId,
-      periodYm,
-      score,
-      trips,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "gamification.leaderboard_override",
+      "DriverLeaderboardOverride",
+      row.id,
+      {
+        driverId,
+        periodYm,
+        score,
+        trips,
+      },
+    );
 
     return row;
   }
 
   async advanceChampionsMonthOverride(actorUserId?: string) {
     const now = new Date();
-    const currentYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const currentYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: { championsPeriodYmOverride: true },
     });
-    const base = (row?.championsPeriodYmOverride?.trim() || currentYm).slice(0, 7);
+    const base = (row?.championsPeriodYmOverride?.trim() || currentYm).slice(
+      0,
+      7,
+    );
     const next = (() => {
       const m = /^(\d{4})-(\d{2})$/.exec(base);
       if (!m) return currentYm;
-      const y = parseInt(m[1]!, 10);
-      const mm = parseInt(m[2]!, 10);
-      const d = new Date(Date.UTC(y, Math.max(0, Math.min(11, mm - 1)), 1, 0, 0, 0, 0));
+      const y = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      const d = new Date(
+        Date.UTC(y, Math.max(0, Math.min(11, mm - 1)), 1, 0, 0, 0, 0),
+      );
       d.setUTCMonth(d.getUTCMonth() + 1);
-      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     })();
 
     await this.prisma.platformSettings.upsert({
-      where: { id: 'default' },
+      where: { id: "default" },
       create: {
-        id: 'default',
+        id: "default",
         championsPeriodYmOverride: next,
       },
       update: {
         championsPeriodYmOverride: next,
       },
     });
-    await this.writeAudit(actorUserId, 'gamification.champions_month_advance', 'PlatformSettings', null, {
-      fromYm: base,
-      toYm: next,
-      settingsRowId: 'default',
-    });
+    await this.writeAudit(
+      actorUserId,
+      "gamification.champions_month_advance",
+      "PlatformSettings",
+      null,
+      {
+        fromYm: base,
+        toYm: next,
+        settingsRowId: "default",
+      },
+    );
     return { ok: true as const, fromYm: base, toYm: next };
   }
 
   async clearChampionsMonthOverride(actorUserId?: string) {
     await this.prisma.platformSettings.upsert({
-      where: { id: 'default' },
-      create: { id: 'default', championsPeriodYmOverride: null },
+      where: { id: "default" },
+      create: { id: "default", championsPeriodYmOverride: null },
       update: { championsPeriodYmOverride: null },
     });
-    await this.writeAudit(actorUserId, 'gamification.champions_month_override_clear', 'PlatformSettings', null, {
-      settingsRowId: 'default',
-    });
+    await this.writeAudit(
+      actorUserId,
+      "gamification.champions_month_override_clear",
+      "PlatformSettings",
+      null,
+      {
+        settingsRowId: "default",
+      },
+    );
     return { ok: true as const };
   }
 
@@ -2536,38 +3069,68 @@ export class AdminService {
     return this.gamification.getXpTierBonusesAdminSettings();
   }
 
-  async patchDriverXpGamificationSettings(actorUserId: string | undefined, body: PatchDriverXpSettingsDto) {
-    const r = await this.gamification.patchXpTierBonusesForAdmin(body.tierBonusesUzs ?? {});
+  async patchDriverXpGamificationSettings(
+    actorUserId: string | undefined,
+    body: PatchDriverXpSettingsDto,
+  ) {
+    const r = await this.gamification.patchXpTierBonusesForAdmin(
+      body.tierBonusesUzs ?? {},
+    );
     // `AuditLog.entityId` — UUID; platform qatori `id = 'default'` UUID emas.
-    await this.writeAudit(actorUserId, 'gamification.driver_xp_tier_bonuses', 'PlatformSettings', null, {
-      settingsRowId: 'default',
-      ...r,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "gamification.driver_xp_tier_bonuses",
+      "PlatformSettings",
+      null,
+      {
+        settingsRowId: "default",
+        ...r,
+      },
+    );
     return r;
   }
 
-  async upsertDriverLifetimeXpOverrideAdmin(actorUserId: string | undefined, driverId: string, xp: number) {
+  async upsertDriverLifetimeXpOverrideAdmin(
+    actorUserId: string | undefined,
+    driverId: string,
+    xp: number,
+  ) {
     const did = driverId.trim();
     await this.gamification.upsertDriverLifetimeXpOverride({
       driverId: did,
       targetXp: xp,
       updatedByUserId: actorUserId ?? null,
     });
-    await this.writeAudit(actorUserId, 'gamification.driver_xp_override', 'DriverLifetimeXpOverride', did, { xp });
+    await this.writeAudit(
+      actorUserId,
+      "gamification.driver_xp_override",
+      "DriverLifetimeXpOverride",
+      did,
+      { xp },
+    );
     return { ok: true as const };
   }
 
-  async deleteDriverLifetimeXpOverrideAdmin(actorUserId: string | undefined, driverId: string) {
+  async deleteDriverLifetimeXpOverrideAdmin(
+    actorUserId: string | undefined,
+    driverId: string,
+  ) {
     const did = driverId.trim();
     await this.gamification.deleteDriverLifetimeXpOverride(did);
-    await this.writeAudit(actorUserId, 'gamification.driver_xp_override_clear', 'DriverLifetimeXpOverride', did, {});
+    await this.writeAudit(
+      actorUserId,
+      "gamification.driver_xp_override_clear",
+      "DriverLifetimeXpOverride",
+      did,
+      {},
+    );
     return { ok: true as const };
   }
 
   async listDriverMonthSettlements(periodYm: string) {
     const rows = await this.prisma.driverMonthSettlement.findMany({
       where: { periodYm: periodYm.trim() },
-      orderBy: { commissionDueUzs: 'desc' },
+      orderBy: { commissionDueUzs: "desc" },
       include: { driver: { include: { user: { select: { phone: true } } } } },
     });
     return {
@@ -2592,21 +3155,34 @@ export class AdminService {
     actorUserId?: string,
     body?: { notes?: string | null },
   ) {
-    const r = await this.prisma.driverMonthSettlement.findUnique({ where: { id } });
+    const r = await this.prisma.driverMonthSettlement.findUnique({
+      where: { id },
+    });
     if (!r) {
-      throw new NotFoundException('Qator topilmadi');
+      throw new NotFoundException("Qator topilmadi");
     }
     const u = await this.prisma.driverMonthSettlement.update({
       where: { id },
       data: {
         status: DriverMonthSettlementStatus.CONFIRMED,
         confirmedAt: new Date(),
-        notes: body?.notes !== undefined ? (body.notes ? body.notes.trim() : null) : undefined,
+        notes:
+          body?.notes !== undefined
+            ? body.notes
+              ? body.notes.trim()
+              : null
+            : undefined,
       },
     });
-    await this.writeAudit(actorUserId, 'finance.settlement.confirm', 'DriverMonthSettlement', id, {
-      periodYm: u.periodYm,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "finance.settlement.confirm",
+      "DriverMonthSettlement",
+      id,
+      {
+        periodYm: u.periodYm,
+      },
+    );
     return { ok: true as const, id: u.id, status: u.status };
   }
 
@@ -2617,10 +3193,10 @@ export class AdminService {
     const title = dto.title.trim();
     const body = dto.body.trim();
     if (!title) {
-      throw new BadRequestException('title bo‘sh bo‘lmasin');
+      throw new BadRequestException("title bo‘sh bo‘lmasin");
     }
     if (!body) {
-      throw new BadRequestException('body bo‘sh bo‘lmasin');
+      throw new BadRequestException("body bo‘sh bo‘lmasin");
     }
 
     const useSocket = dto.channels?.socket !== false;
@@ -2630,15 +3206,15 @@ export class AdminService {
       dto.channels.socket === false &&
       dto.channels.push === false;
     if (!listOnly && !useSocket && !usePush) {
-      throw new BadRequestException('Kamida bitta kanal: socket yoki push');
+      throw new BadRequestException("Kamida bitta kanal: socket yoki push");
     }
 
     const maxTargets =
-      this.config.get<number>('ADMIN_DRIVER_BROADCAST_MAX_TARGETS') ?? 15_000;
+      this.config.get<number>("ADMIN_DRIVER_BROADCAST_MAX_TARGETS") ?? 15_000;
 
     const ids = await this.resolveBroadcastDriverIds(dto);
     if (ids.length === 0) {
-      throw new BadRequestException('Hech qanday haydovchi topilmadi');
+      throw new BadRequestException("Hech qanday haydovchi topilmadi");
     }
     if (ids.length > maxTargets) {
       throw new BadRequestException(
@@ -2660,7 +3236,7 @@ export class AdminService {
               this.driverWs.emitDriverNotice(driverId, {
                 v: 1,
                 id: randomUUID(),
-                category: 'admin_news',
+                category: "admin_news",
                 title,
                 body,
                 occurredAt: new Date().toISOString(),
@@ -2672,7 +3248,7 @@ export class AdminService {
               const r = await this.push.notifyDriver(
                 driverId,
                 null,
-                'admin_news',
+                "admin_news",
                 body,
                 undefined,
                 { pushTitle: title },
@@ -2684,16 +3260,22 @@ export class AdminService {
       }
     }
 
-    await this.writeAudit(actorUserId, 'notification.driver_broadcast', 'Broadcast', null, {
-      audience: dto.audience,
-      targeted: ids.length,
-      socketEmitted,
-      pushAttempted,
-      pushDelivered,
-      useSocket,
-      usePush,
-      listOnly,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "notification.driver_broadcast",
+      "Broadcast",
+      null,
+      {
+        audience: dto.audience,
+        targeted: ids.length,
+        socketEmitted,
+        pushAttempted,
+        pushDelivered,
+        useSocket,
+        usePush,
+        listOnly,
+      },
+    );
 
     await this.prisma.adminNewsBroadcast.create({
       data: {
@@ -2701,9 +3283,13 @@ export class AdminService {
         body,
         audience: dto.audience,
         serviceZoneId:
-          dto.audience === DriverBroadcastAudience.ZONE ? dto.serviceZoneId ?? null : null,
+          dto.audience === DriverBroadcastAudience.ZONE
+            ? (dto.serviceZoneId ?? null)
+            : null,
         targetDriverId:
-          dto.audience === DriverBroadcastAudience.SINGLE_DRIVER ? dto.driverId ?? null : null,
+          dto.audience === DriverBroadcastAudience.SINGLE_DRIVER
+            ? (dto.driverId ?? null)
+            : null,
         targetedCount: ids.length,
       },
     });
@@ -2725,7 +3311,7 @@ export class AdminService {
     const [total, rows] = await Promise.all([
       this.prisma.adminNewsBroadcast.count(),
       this.prisma.adminNewsBroadcast.findMany({
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take,
         skip,
         select: {
@@ -2749,15 +3335,22 @@ export class AdminService {
     };
   }
 
-  async updateAdminDriverNews(id: string, dto: UpdateAdminDriverNewsDto, actorUserId?: string) {
-    const row = await this.prisma.adminNewsBroadcast.findUnique({ where: { id } });
+  async updateAdminDriverNews(
+    id: string,
+    dto: UpdateAdminDriverNewsDto,
+    actorUserId?: string,
+  ) {
+    const row = await this.prisma.adminNewsBroadcast.findUnique({
+      where: { id },
+    });
     if (!row) {
-      throw new NotFoundException('Xabar topilmadi');
+      throw new NotFoundException("Xabar topilmadi");
     }
 
-    const nextAudience = (dto.audience ?? row.audience) as DriverBroadcastAudience;
+    const nextAudience = (dto.audience ??
+      row.audience) as DriverBroadcastAudience;
     if (!Object.values(DriverBroadcastAudience).includes(nextAudience)) {
-      throw new BadRequestException('Noto‘g‘ri audience');
+      throw new BadRequestException("Noto‘g‘ri audience");
     }
 
     const merged: SendDriverBroadcastDto = {
@@ -2766,26 +3359,26 @@ export class AdminService {
       audience: nextAudience,
       serviceZoneId:
         nextAudience === DriverBroadcastAudience.ZONE
-          ? dto.serviceZoneId ?? row.serviceZoneId ?? undefined
+          ? (dto.serviceZoneId ?? row.serviceZoneId ?? undefined)
           : undefined,
       driverId:
         nextAudience === DriverBroadcastAudience.SINGLE_DRIVER
-          ? dto.driverId ?? row.targetDriverId ?? undefined
+          ? (dto.driverId ?? row.targetDriverId ?? undefined)
           : undefined,
     };
 
     if (!merged.title) {
-      throw new BadRequestException('title bo‘sh bo‘lmasin');
+      throw new BadRequestException("title bo‘sh bo‘lmasin");
     }
     if (!merged.body) {
-      throw new BadRequestException('body bo‘sh bo‘lmasin');
+      throw new BadRequestException("body bo‘sh bo‘lmasin");
     }
 
     const maxTargets =
-      this.config.get<number>('ADMIN_DRIVER_BROADCAST_MAX_TARGETS') ?? 15_000;
+      this.config.get<number>("ADMIN_DRIVER_BROADCAST_MAX_TARGETS") ?? 15_000;
     const ids = await this.resolveBroadcastDriverIds(merged);
     if (ids.length === 0) {
-      throw new BadRequestException('Hech qanday haydovchi topilmadi');
+      throw new BadRequestException("Hech qanday haydovchi topilmadi");
     }
     if (ids.length > maxTargets) {
       throw new BadRequestException(
@@ -2800,34 +3393,54 @@ export class AdminService {
         body: merged.body,
         audience: merged.audience,
         serviceZoneId:
-          merged.audience === DriverBroadcastAudience.ZONE ? merged.serviceZoneId ?? null : null,
+          merged.audience === DriverBroadcastAudience.ZONE
+            ? (merged.serviceZoneId ?? null)
+            : null,
         targetDriverId:
-          merged.audience === DriverBroadcastAudience.SINGLE_DRIVER ? merged.driverId ?? null : null,
+          merged.audience === DriverBroadcastAudience.SINGLE_DRIVER
+            ? (merged.driverId ?? null)
+            : null,
         targetedCount: ids.length,
       },
     });
 
-    await this.writeAudit(actorUserId, 'notification.driver_news.update', 'AdminNewsBroadcast', id, {
-      audience: merged.audience,
-      targetedCount: ids.length,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "notification.driver_news.update",
+      "AdminNewsBroadcast",
+      id,
+      {
+        audience: merged.audience,
+        targetedCount: ids.length,
+      },
+    );
 
     return { ok: true as const };
   }
 
   async deleteAdminDriverNews(id: string, actorUserId?: string) {
-    const row = await this.prisma.adminNewsBroadcast.findUnique({ where: { id } });
+    const row = await this.prisma.adminNewsBroadcast.findUnique({
+      where: { id },
+    });
     if (!row) {
-      throw new NotFoundException('Xabar topilmadi');
+      throw new NotFoundException("Xabar topilmadi");
     }
     await this.prisma.adminNewsBroadcast.delete({ where: { id } });
-    await this.writeAudit(actorUserId, 'notification.driver_news.delete', 'AdminNewsBroadcast', id, {
-      title: row.title,
-    });
+    await this.writeAudit(
+      actorUserId,
+      "notification.driver_news.delete",
+      "AdminNewsBroadcast",
+      id,
+      {
+        title: row.title,
+      },
+    );
     return { ok: true as const };
   }
 
-  private async resolveBroadcastDriverIds(dto: SendDriverBroadcastDto): Promise<string[]> {
+  private async resolveBroadcastDriverIds(
+    dto: SendDriverBroadcastDto,
+  ): Promise<string[]> {
     const approvedActive = {
       user: { status: UserAccountStatus.ACTIVE },
       onboardingStatus: DriverOnboardingStatus.APPROVED,
@@ -2835,28 +3448,30 @@ export class AdminService {
 
     if (dto.audience === DriverBroadcastAudience.SINGLE_DRIVER) {
       if (!dto.driverId) {
-        throw new BadRequestException('driverId majburiy');
+        throw new BadRequestException("driverId majburiy");
       }
       const d = await this.prisma.driver.findFirst({
         where: { id: dto.driverId, ...approvedActive },
         select: { id: true },
       });
       if (!d) {
-        throw new NotFoundException('Haydovchi topilmadi yoki ariza tasdiqlanmagan / hisob aktiv emas');
+        throw new NotFoundException(
+          "Haydovchi topilmadi yoki ariza tasdiqlanmagan / hisob aktiv emas",
+        );
       }
       return [d.id];
     }
 
     if (dto.audience === DriverBroadcastAudience.ZONE) {
       if (!dto.serviceZoneId) {
-        throw new BadRequestException('serviceZoneId majburiy');
+        throw new BadRequestException("serviceZoneId majburiy");
       }
       const z = await this.prisma.serviceZone.findUnique({
         where: { id: dto.serviceZoneId },
         select: { id: true },
       });
       if (!z) {
-        throw new NotFoundException('Zona topilmadi');
+        throw new NotFoundException("Zona topilmadi");
       }
       const rows = await this.prisma.driver.findMany({
         where: { ...approvedActive, serviceZoneId: dto.serviceZoneId },

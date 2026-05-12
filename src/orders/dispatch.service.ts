@@ -4,8 +4,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   DriverOperationalStatus,
   OrderAssignmentStatus,
@@ -14,17 +14,17 @@ import {
   TripEventType,
   TripStatus,
   UserAccountStatus,
-} from '@prisma/client';
-import { distanceMetersHaversine } from '../common/haversine';
-import { PrismaService } from '../prisma/prisma.service';
-import { OperationalNotificationsService } from '../notifications/operational-notifications.service';
-import { LastKnownStore } from '../tracking/last-known.store';
-import { DriverGateway } from '../driver-ws/driver.gateway';
-import { OperatorGateway } from '../tracking/operator.gateway';
-import { LedgerService } from '../ledger/ledger.service';
-import { BroadcastOrderDto } from './dto/broadcast-order.dto';
-import { CreateOrderDto } from './dto/create-order.dto';
-import { PricingEngineService } from './pricing-engine.service';
+} from "@prisma/client";
+import { distanceMetersHaversine } from "../common/haversine";
+import { PrismaService } from "../prisma/prisma.service";
+import { OperationalNotificationsService } from "../notifications/operational-notifications.service";
+import { LastKnownStore } from "../tracking/last-known.store";
+import { DriverGateway } from "../driver-ws/driver.gateway";
+import { OperatorGateway } from "../tracking/operator.gateway";
+import { LedgerService } from "../ledger/ledger.service";
+import { BroadcastOrderDto } from "./dto/broadcast-order.dto";
+import { CreateOrderDto } from "./dto/create-order.dto";
+import { PricingEngineService } from "./pricing-engine.service";
 
 @Injectable()
 export class DispatchService {
@@ -42,11 +42,11 @@ export class DispatchService {
   ) {}
 
   private defaultMaxDrivers() {
-    return this.config.get<number>('DISPATCH_MAX_DRIVERS_PER_ROUND', 5);
+    return this.config.get<number>("DISPATCH_MAX_DRIVERS_PER_ROUND", 5);
   }
 
   private defaultOfferTtlSec() {
-    return this.config.get<number>('DISPATCH_OFFER_TTL_SEC', 45);
+    return this.config.get<number>("DISPATCH_OFFER_TTL_SEC", 45);
   }
 
   private async walletThresholds() {
@@ -72,7 +72,10 @@ export class DispatchService {
         data: { status: OrderAssignmentStatus.EXPIRED, decidedAt: now },
       });
       await this.prisma.driver.updateMany({
-        where: { id: a.driverId, operationalStatus: DriverOperationalStatus.ORDER_OFFERED },
+        where: {
+          id: a.driverId,
+          operationalStatus: DriverOperationalStatus.ORDER_OFFERED,
+        },
         data: { operationalStatus: DriverOperationalStatus.ONLINE_IDLE },
       });
     }
@@ -107,7 +110,9 @@ export class DispatchService {
       pricingOverrideReason: pricing.pricingOverrideReason,
     };
     if (dto.operatorEnteredFareUzs != null) {
-      data.operatorEnteredFareUzs = new Prisma.Decimal(dto.operatorEnteredFareUzs);
+      data.operatorEnteredFareUzs = new Prisma.Decimal(
+        dto.operatorEnteredFareUzs,
+      );
     }
     if (dto.pickupLat != null && dto.pickupLng != null) {
       data.pickupLat = new Prisma.Decimal(dto.pickupLat);
@@ -174,12 +179,15 @@ export class DispatchService {
       where: { id: orderId },
       include: { serviceZone: true },
     });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== OrderStatus.CREATED && order.status !== OrderStatus.BROADCASTED) {
+    if (!order) throw new NotFoundException("Order not found");
+    if (
+      order.status !== OrderStatus.CREATED &&
+      order.status !== OrderStatus.BROADCASTED
+    ) {
       throw new ConflictException(`Order not broadcastable: ${order.status}`);
     }
     if (!order.serviceZoneId) {
-      throw new BadRequestException('Order has no service zone');
+      throw new BadRequestException("Order has no service zone");
     }
 
     const agg = await this.prisma.orderAssignment.aggregate({
@@ -198,12 +206,18 @@ export class DispatchService {
         data: { status: OrderAssignmentStatus.SUPERSEDED, decidedAt: now },
       });
       await this.prisma.driver.updateMany({
-        where: { id: p.driverId, operationalStatus: DriverOperationalStatus.ORDER_OFFERED },
+        where: {
+          id: p.driverId,
+          operationalStatus: DriverOperationalStatus.ORDER_OFFERED,
+        },
         data: { operationalStatus: DriverOperationalStatus.ONLINE_IDLE },
       });
     }
 
-    const driverIds = await this.selectCandidateDrivers(order.serviceZoneId, maxD);
+    const driverIds = await this.selectCandidateDrivers(
+      order.serviceZoneId,
+      maxD,
+    );
     if (driverIds.length === 0) {
       const { minDispatchBalanceUzs } = await this.walletThresholds();
       const [onlineIdle, blockedByBalance] = await Promise.all([
@@ -224,15 +238,15 @@ export class DispatchService {
         }),
       ]);
       throw new BadRequestException({
-        code: 'NO_ELIGIBLE_DRIVERS',
+        code: "NO_ELIGIBLE_DRIVERS",
         reason:
           onlineIdle > 0 && blockedByBalance === onlineIdle
-            ? 'LOW_COMMISSION_WALLET_BALANCE'
-            : 'NO_ONLINE_IDLE_DRIVERS',
+            ? "LOW_COMMISSION_WALLET_BALANCE"
+            : "NO_ONLINE_IDLE_DRIVERS",
         message:
           onlineIdle > 0 && blockedByBalance === onlineIdle
             ? `Online haydovchilar bor, lekin balans min dispatch threshold (${minDispatchBalanceUzs} so'm) dan past.`
-            : 'No online drivers in zone (ONLINE_IDLE)',
+            : "No online drivers in zone (ONLINE_IDLE)",
         onlineIdle,
         blockedByBalance,
         minDispatchBalanceUzs,
@@ -269,7 +283,7 @@ export class DispatchService {
 
     const gate = await this.walletThresholds();
     const payload = {
-      type: 'broadcast',
+      type: "broadcast",
       orderId,
       round: nextRound,
       offerTtlSec: ttlSec,
@@ -282,7 +296,8 @@ export class DispatchService {
         pickupLandmark: order.pickupLandmark,
         dropoffText: order.dropoffText,
         paymentType: order.paymentType,
-        operatorEnteredFareUzs: order.operatorEnteredFareUzs?.toString() ?? null,
+        operatorEnteredFareUzs:
+          order.operatorEnteredFareUzs?.toString() ?? null,
         serviceZoneId: order.serviceZoneId,
       },
     };
@@ -303,7 +318,11 @@ export class DispatchService {
         customerPhone: order.customerPhone,
         pickupLandmark: order.pickupLandmark,
       })
-      .catch((e) => this.log.warn(`SMS after broadcast: ${e instanceof Error ? e.message : e}`));
+      .catch((e) =>
+        this.log.warn(
+          `SMS after broadcast: ${e instanceof Error ? e.message : e}`,
+        ),
+      );
 
     return {
       order: updateOrder,
@@ -324,7 +343,7 @@ export class DispatchService {
         expiresAt: { gt: new Date() },
         order: { status: OrderStatus.BROADCASTED },
       },
-      orderBy: { offeredAt: 'desc' },
+      orderBy: { offeredAt: "desc" },
       include: { order: { include: { serviceZone: true } } },
     });
     if (!a) {
@@ -335,17 +354,20 @@ export class DispatchService {
       const thresholds = await this.walletThresholds();
       const balance = Number(driver?.balanceUzs ?? 0);
       return {
-        offer: null as null,
+        offer: null,
         financeGate: {
           ...thresholds,
-          balanceUzs: driver?.balanceUzs.toString() ?? '0',
+          balanceUzs: driver?.balanceUzs.toString() ?? "0",
           status:
             balance < thresholds.minDispatchBalanceUzs
-              ? 'blocked'
+              ? "blocked"
               : balance < thresholds.lowBalanceThresholdUzs
-                ? 'low'
-                : 'ok',
-          reason: balance < thresholds.minDispatchBalanceUzs ? 'LOW_COMMISSION_WALLET_BALANCE' : null,
+                ? "low"
+                : "ok",
+          reason:
+            balance < thresholds.minDispatchBalanceUzs
+              ? "LOW_COMMISSION_WALLET_BALANCE"
+              : null,
         },
       };
     }
@@ -364,7 +386,8 @@ export class DispatchService {
           dropoffText: a.order.dropoffText,
           paymentType: a.order.paymentType,
           fareMode: a.order.fareMode,
-          operatorEnteredFareUzs: a.order.operatorEnteredFareUzs?.toString() ?? null,
+          operatorEnteredFareUzs:
+            a.order.operatorEnteredFareUzs?.toString() ?? null,
           starterFeeUzs:
             a.order.starterFeeUzs?.toString() ??
             a.order.serviceZone?.starterFeeUzs?.toString() ??
@@ -381,20 +404,25 @@ export class DispatchService {
     const { minDispatchBalanceUzs } = await this.walletThresholds();
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order) throw new NotFoundException("Order not found");
       if (order.status !== OrderStatus.BROADCASTED) {
-        throw new ConflictException(`Order not in broadcast state: ${order.status}`);
+        throw new ConflictException(
+          `Order not in broadcast state: ${order.status}`,
+        );
       }
 
       const driver = await tx.driver.findUnique({
         where: { id: driverId },
         select: { balanceUzs: true },
       });
-      if (!driver || driver.balanceUzs.lt(new Prisma.Decimal(minDispatchBalanceUzs))) {
+      if (
+        !driver ||
+        driver.balanceUzs.lt(new Prisma.Decimal(minDispatchBalanceUzs))
+      ) {
         throw new ConflictException({
-          code: 'LOW_COMMISSION_WALLET_BALANCE',
+          code: "LOW_COMMISSION_WALLET_BALANCE",
           message: `Balans min dispatch threshold (${minDispatchBalanceUzs} so'm) dan past.`,
-          balanceUzs: driver?.balanceUzs.toString() ?? '0',
+          balanceUzs: driver?.balanceUzs.toString() ?? "0",
           minDispatchBalanceUzs,
         });
       }
@@ -408,7 +436,7 @@ export class DispatchService {
         },
       });
       if (!asg) {
-        throw new NotFoundException('No active offer for you on this order');
+        throw new NotFoundException("No active offer for you on this order");
       }
 
       const otherPending = await tx.orderAssignment.findMany({
@@ -422,7 +450,10 @@ export class DispatchService {
       for (const o of otherPending) {
         await tx.orderAssignment.update({
           where: { id: o.id },
-          data: { status: OrderAssignmentStatus.SUPERSEDED, decidedAt: new Date() },
+          data: {
+            status: OrderAssignmentStatus.SUPERSEDED,
+            decidedAt: new Date(),
+          },
         });
         await tx.driver.update({
           where: { id: o.driverId },
@@ -463,9 +494,9 @@ export class DispatchService {
           ? Number(order.starterFeeUzs)
           : zone?.starterFeeUzs != null
             ? Number(zone.starterFeeUzs)
-          : zone?.meterBaseUzs != null
-            ? Number(zone.meterBaseUzs)
-            : this.config.get<number>('METER_BASE_FARE_UZS', 5000);
+            : zone?.meterBaseUzs != null
+              ? Number(zone.meterBaseUzs)
+              : this.config.get<number>("METER_BASE_FARE_UZS", 5000);
       const freeWait = order.freeWaitMinutes ?? zone?.waitingFreeMinutes ?? 10;
       const waitPerMin =
         order.waitingFeePerMinuteUzs != null
@@ -491,7 +522,7 @@ export class DispatchService {
         data: {
           tripId: trip.id,
           type: TripEventType.TRIP_RESERVED,
-          payload: { orderId, driverId } as object,
+          payload: { orderId, driverId },
         },
       });
 
@@ -500,11 +531,15 @@ export class DispatchService {
         data: { operationalStatus: DriverOperationalStatus.EN_ROUTE_PICKUP },
       });
 
-      return { order: await tx.order.findUnique({ where: { id: orderId } }), trip, tripId: trip.id };
+      return {
+        order: await tx.order.findUnique({ where: { id: orderId } }),
+        trip,
+        tripId: trip.id,
+      };
     });
 
     this.operatorGateway.emitOrderUpdate(result.order?.serviceZoneId ?? null, {
-      type: 'accepted',
+      type: "accepted",
       orderId,
       driverId,
       tripId: result.tripId,
@@ -519,7 +554,11 @@ export class DispatchService {
           },
           driverId,
         )
-        .catch((e) => this.log.warn(`Notify after accept: ${e instanceof Error ? e.message : e}`));
+        .catch((e) =>
+          this.log.warn(
+            `Notify after accept: ${e instanceof Error ? e.message : e}`,
+          ),
+        );
     }
     return result;
   }
@@ -534,21 +573,27 @@ export class DispatchService {
       },
     });
     if (!asg) {
-      throw new NotFoundException('No pending offer to reject');
+      throw new NotFoundException("No pending offer to reject");
     }
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found');
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException("Order not found");
     const now = new Date();
     await this.prisma.orderAssignment.update({
       where: { id: asg.id },
-      data: { status: OrderAssignmentStatus.REJECTED, decidedAt: now, rejectNote: note },
+      data: {
+        status: OrderAssignmentStatus.REJECTED,
+        decidedAt: now,
+        rejectNote: note,
+      },
     });
     await this.prisma.driver.update({
       where: { id: driverId },
       data: { operationalStatus: DriverOperationalStatus.ONLINE_IDLE },
     });
     this.operatorGateway.emitOrderUpdate(order.serviceZoneId, {
-      type: 'rejected',
+      type: "rejected",
       orderId,
       driverId,
     });
@@ -559,7 +604,7 @@ export class DispatchService {
     return this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        assignments: { orderBy: { offeredAt: 'desc' } },
+        assignments: { orderBy: { offeredAt: "desc" } },
         assignedDriver: { include: { user: { select: { phone: true } } } },
         serviceZone: true,
         trip: true,
@@ -572,7 +617,7 @@ export class DispatchService {
   async listOrdersForOperator(serviceZoneId?: string, limit = 30) {
     return this.prisma.order.findMany({
       where: serviceZoneId ? { serviceZoneId } : undefined,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
       include: {
         assignedDriver: { select: { id: true } },

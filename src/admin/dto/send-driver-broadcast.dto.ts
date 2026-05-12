@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsEnum,
@@ -8,12 +8,12 @@ import {
   MaxLength,
   ValidateIf,
   ValidateNested,
-} from 'class-validator';
+} from "class-validator";
 
 export enum DriverBroadcastAudience {
-  ALL_APPROVED = 'all_approved',
-  ZONE = 'zone',
-  SINGLE_DRIVER = 'single_driver',
+  ALL_APPROVED = "all_approved",
+  ZONE = "zone",
+  SINGLE_DRIVER = "single_driver",
 }
 
 export class DriverBroadcastChannelsDto {
@@ -43,11 +43,16 @@ export class SendDriverBroadcastDto {
   @Type(() => DriverBroadcastChannelsDto)
   channels?: DriverBroadcastChannelsDto;
 
-  @ValidateIf((o: SendDriverBroadcastDto) => o.audience === DriverBroadcastAudience.ZONE)
+  @ValidateIf(
+    (o: SendDriverBroadcastDto) => o.audience === DriverBroadcastAudience.ZONE,
+  )
   @IsUUID()
   serviceZoneId!: string | undefined;
 
-  @ValidateIf((o: SendDriverBroadcastDto) => o.audience === DriverBroadcastAudience.SINGLE_DRIVER)
+  @ValidateIf(
+    (o: SendDriverBroadcastDto) =>
+      o.audience === DriverBroadcastAudience.SINGLE_DRIVER,
+  )
   @IsUUID()
   driverId!: string | undefined;
 }

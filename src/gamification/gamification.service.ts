@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, TripStatus } from '@prisma/client';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { OrderStatus, TripStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 
 /** Chempionlar tab preview — qolganlari /monthly-leaderboard orqali */
 const MONTHLY_PREVIEW_TOP = 5;
@@ -10,7 +10,13 @@ const MONTHLY_PREVIEW_TOP = 5;
 function startOfIsoWeekUtc(now = new Date()): Date {
   const dow = now.getUTCDay();
   const mondayOffset = (dow + 6) % 7;
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - mondayOffset));
+  const d = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - mondayOffset,
+    ),
+  );
   d.setUTCHours(0, 0, 0, 0);
   return d;
 }
@@ -23,47 +29,48 @@ function endOfIsoWeekUtc(now = new Date()): Date {
 }
 
 function startOfMonthUtc(now = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
 }
 
 function endOfMonthUtc(now = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  );
 }
 
 function ymUtc(now = new Date()): string {
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthWindowFromYmUtc(ym: string | null | undefined): { from: Date; to: Date; ym: string } {
+function monthWindowFromYmUtc(ym: string | null | undefined): {
+  from: Date;
+  to: Date;
+  ym: string;
+} {
   const now = new Date();
   const defFrom = startOfMonthUtc(now);
   const defTo = endOfMonthUtc(now);
   const defYm = ymUtc(now);
-  const s = (ym ?? '').trim();
+  const s = (ym ?? "").trim();
   const m = /^(\d{4})-(\d{2})$/.exec(s);
   if (!m) return { from: defFrom, to: defTo, ym: defYm };
-  const y = parseInt(m[1]!, 10);
-  const mm = parseInt(m[2]!, 10);
-  if (!Number.isFinite(y) || !Number.isFinite(mm) || mm < 1 || mm > 12) return { from: defFrom, to: defTo, ym: defYm };
+  const y = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (!Number.isFinite(y) || !Number.isFinite(mm) || mm < 1 || mm > 12)
+    return { from: defFrom, to: defTo, ym: defYm };
   const from = new Date(Date.UTC(y, mm - 1, 1, 0, 0, 0, 0));
   const to = new Date(Date.UTC(y, mm, 1, 0, 0, 0, 0));
-  return { from, to, ym: `${y}-${String(mm).padStart(2, '0')}` };
+  return { from, to, ym: `${y}-${String(mm).padStart(2, "0")}` };
 }
 
 function endOfQuarterUtc(now = new Date()): Date {
   const q = Math.floor(now.getUTCMonth() / 3);
-  const endMonthIdx = [2, 5, 8, 11][q]!;
-  return new Date(Date.UTC(now.getUTCFullYear(), endMonthIdx + 1, 0, 23, 59, 59, 999));
-}
-
-function nextYmUtc(ym: string): string {
-  const m = /^(\d{4})-(\d{2})$/.exec(ym.trim());
-  if (!m) return ymUtc(new Date());
-  const y = parseInt(m[1]!, 10);
-  const mm = parseInt(m[2]!, 10);
-  const d = new Date(Date.UTC(y, Math.max(0, Math.min(11, mm - 1)), 1, 0, 0, 0, 0));
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  return ymUtc(d);
+  const endMonthIdx = [2, 5, 8, 11][q];
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), endMonthIdx + 1, 0, 23, 59, 59, 999),
+  );
 }
 
 type RowAgg = {
@@ -91,28 +98,45 @@ export function applyLifetimeXpOverrideReactive(params: {
 }
 
 /** Mobil/admin UI: tier jadvali (XP thresholds). */
-export const XP_TIER_DEFINITIONS: ReadonlyArray<{ id: string; labelUz: string; minXp: number }> = [
-  { id: 'STARTER', labelUz: 'START', minXp: 0 },
-  { id: 'BRONZE', labelUz: 'BRONZE', minXp: 500 },
-  { id: 'SILVER', labelUz: 'SILVER', minXp: 1000 },
-  { id: 'GOLD', labelUz: 'GOLD', minXp: 2500 },
-  { id: 'PLATINUM', labelUz: 'PLATINUM', minXp: 5000 },
-  { id: 'DIAMOND', labelUz: 'DIAMOND', minXp: 10000 },
+export const XP_TIER_DEFINITIONS: ReadonlyArray<{
+  id: string;
+  labelUz: string;
+  minXp: number;
+}> = [
+  { id: "STARTER", labelUz: "START", minXp: 0 },
+  { id: "BRONZE", labelUz: "BRONZE", minXp: 500 },
+  { id: "SILVER", labelUz: "SILVER", minXp: 1000 },
+  { id: "GOLD", labelUz: "GOLD", minXp: 2500 },
+  { id: "PLATINUM", labelUz: "PLATINUM", minXp: 5000 },
+  { id: "DIAMOND", labelUz: "DIAMOND", minXp: 10000 },
 ];
 
-export type XpTierWithBonusPayload = { id: string; labelUz: string; minXp: number; bonusUzs: number };
+export type XpTierWithBonusPayload = {
+  id: string;
+  labelUz: string;
+  minXp: number;
+  bonusUzs: number;
+};
 
 function applyOverrideReactive(params: {
   realTrips: number;
   realCancels: number;
-  override: { score: number; trips: number; baseTrips?: number | null; baseCancels?: number | null };
+  override: {
+    score: number;
+    trips: number;
+    baseTrips?: number | null;
+    baseCancels?: number | null;
+  };
 }): { trips: number; score: number } {
   const baseTrips = Math.max(0, Math.trunc(params.override.baseTrips ?? 0));
   const baseCancels = Math.max(0, Math.trunc(params.override.baseCancels ?? 0));
   const deltaTrips = Math.max(0, params.realTrips - baseTrips);
   const deltaCancels = Math.max(0, params.realCancels - baseCancels);
   const trips = Math.max(0, params.override.trips + deltaTrips);
-  const score = Math.max(0, params.override.score + deltaTrips * 100 - deltaCancels * 40);
+  const score = Math.max(
+    0,
+    params.override.score + deltaTrips * 100 - deltaCancels * 40,
+  );
   return { trips, score };
 }
 
@@ -129,32 +153,33 @@ export class GamificationService {
 
   private async championsYmOverride(): Promise<string | null> {
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: { championsPeriodYmOverride: true },
     });
-    const v = row?.championsPeriodYmOverride?.trim() ?? '';
+    const v = row?.championsPeriodYmOverride?.trim() ?? "";
     return v.length ? v.slice(0, 7) : null;
   }
 
-  private async loadDriverXpTierBonusesUzsMap(): Promise<Record<string, number>> {
+  private async loadDriverXpTierBonusesUzsMap(): Promise<
+    Record<string, number>
+  > {
     const row = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: { driverXpTierBonusesUzsJson: true, driverXpBonusUzs: true },
     });
     const uniform = Math.max(0, Math.trunc(row?.driverXpBonusUzs ?? 0));
-    const out: Record<string, number> = Object.fromEntries(XP_TIER_DEFINITIONS.map((t) => [t.id, 0])) as Record<
-      string,
-      number
-    >;
+    const out: Record<string, number> = Object.fromEntries(
+      XP_TIER_DEFINITIONS.map((t) => [t.id, 0]),
+    );
     const raw = row?.driverXpTierBonusesUzsJson;
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
       const obj = raw as Record<string, unknown>;
       for (const t of XP_TIER_DEFINITIONS) {
         const v = obj[t.id];
         let n = 0;
-        if (typeof v === 'number' && Number.isFinite(v)) n = Math.trunc(v);
-        else if (typeof v === 'string' && v.trim().length)
-          n = Math.trunc(Number(v.replace(/\s/g, '').replace(/,/g, '')) || 0);
+        if (typeof v === "number" && Number.isFinite(v)) n = Math.trunc(v);
+        else if (typeof v === "string" && v.trim().length)
+          n = Math.trunc(Number(v.replace(/\s/g, "").replace(/,/g, "")) || 0);
         out[t.id] = Math.max(0, Math.min(100_000_000, n));
       }
       return out;
@@ -163,7 +188,9 @@ export class GamificationService {
     return out;
   }
 
-  async buildXpTiersPublicPayload(): Promise<readonly XpTierWithBonusPayload[]> {
+  async buildXpTiersPublicPayload(): Promise<
+    readonly XpTierWithBonusPayload[]
+  > {
     const map = await this.loadDriverXpTierBonusesUzsMap();
     return XP_TIER_DEFINITIONS.map((t) => ({
       id: t.id,
@@ -184,16 +211,16 @@ export class GamificationService {
     const inObj = tierBonusesUzs ?? {};
     for (const t of XP_TIER_DEFINITIONS) {
       if (!Object.prototype.hasOwnProperty.call(inObj, t.id)) continue;
-      const raw = (inObj as Record<string, unknown>)[t.id];
+      const raw = inObj[t.id];
       let n = 0;
-      if (typeof raw === 'number' && Number.isFinite(raw)) n = Math.trunc(raw);
-      else if (typeof raw === 'string' && raw.trim().length)
-        n = Math.trunc(Number(raw.replace(/\s/g, '').replace(/,/g, '')) || 0);
+      if (typeof raw === "number" && Number.isFinite(raw)) n = Math.trunc(raw);
+      else if (typeof raw === "string" && raw.trim().length)
+        n = Math.trunc(Number(raw.replace(/\s/g, "").replace(/,/g, "")) || 0);
       next[t.id] = Math.max(0, Math.min(100_000_000, n));
     }
     await this.prisma.platformSettings.upsert({
-      where: { id: 'default' },
-      create: { id: 'default', driverXpTierBonusesUzsJson: next },
+      where: { id: "default" },
+      create: { id: "default", driverXpTierBonusesUzsJson: next },
       update: { driverXpTierBonusesUzsJson: next },
     });
     return { tiers: await this.buildXpTiersPublicPayload() };
@@ -218,7 +245,10 @@ export class GamificationService {
     const xpStats = await this.computeLifetimeXp(driverId);
     const realComputedXp = xpStats.xp;
     const override = await this.fetchLifetimeXpOverride(driverId);
-    const effectiveXp = applyLifetimeXpOverrideReactive({ realComputedXp, override });
+    const effectiveXp = applyLifetimeXpOverrideReactive({
+      realComputedXp,
+      override,
+    });
     return { realComputedXp, effectiveXp, override };
   }
 
@@ -247,20 +277,32 @@ export class GamificationService {
 
   async deleteDriverLifetimeXpOverride(driverId: string) {
     try {
-      await this.prisma.driverLifetimeXpOverride.delete({ where: { driverId } });
+      await this.prisma.driverLifetimeXpOverride.delete({
+        where: { driverId },
+      });
     } catch {
       // ignore
     }
   }
 
   /** Admin: zona bo‘yicha haydovchilar XP (qidiruv + sahifa, global saralash). */
-  async getAdminZoneXpLeaderboardPage(zoneId: string, pageRaw: number, limitRaw: number, search?: string) {
+  async getAdminZoneXpLeaderboardPage(
+    zoneId: string,
+    pageRaw: number,
+    limitRaw: number,
+    search?: string,
+  ) {
     const page = Math.max(1, Math.floor(pageRaw) || 1);
     const limit = Math.min(50, Math.max(1, Math.floor(limitRaw) || 20));
-    const q = (search ?? '').trim().toLowerCase();
-    const digits = q.replace(/\D/g, '');
+    const q = (search ?? "").trim().toLowerCase();
+    const digits = q.replace(/\D/g, "");
 
-    type AggRow = { id: string; trips: bigint | number | null; trip_minutes: number | null; pings: bigint | number | null };
+    type AggRow = {
+      id: string;
+      trips: bigint | number | null;
+      trip_minutes: number | null;
+      pings: bigint | number | null;
+    };
     const agg = await this.prisma.$queryRaw<AggRow[]>`
       WITH zd AS (
         SELECT d.id
@@ -295,10 +337,16 @@ export class GamificationService {
       const tripMinutes = Math.max(0, Math.round(Number(r.trip_minutes ?? 0)));
       const pings = Number(r.pings ?? 0);
       const onlineMinutesProxy = Math.max(0, Math.round(pings * 2));
-      return trips * 10 + tripMinutes * 1 + Math.round(onlineMinutesProxy * 0.2);
+      return (
+        trips * 10 + tripMinutes * 1 + Math.round(onlineMinutesProxy * 0.2)
+      );
     };
 
-    let ovAll: { driverId: string; xp: number; baseComputedXp: number | null }[] = [];
+    let ovAll: {
+      driverId: string;
+      xp: number;
+      baseComputedXp: number | null;
+    }[] = [];
     try {
       ovAll = await this.prisma.driverLifetimeXpOverride.findMany({
         where: { driverId: { in: agg.map((a) => a.id) } },
@@ -307,7 +355,12 @@ export class GamificationService {
     } catch {
       ovAll = [];
     }
-    const ovMap = new Map(ovAll.map((o) => [o.driverId, { xp: o.xp, baseComputedXp: o.baseComputedXp }]));
+    const ovMap = new Map(
+      ovAll.map((o) => [
+        o.driverId,
+        { xp: o.xp, baseComputedXp: o.baseComputedXp },
+      ]),
+    );
 
     const drivers = await this.prisma.driver.findMany({
       where: { id: { in: agg.map((a) => a.id) } },
@@ -337,10 +390,13 @@ export class GamificationService {
       if (!d) continue;
       const real = xpFromAgg(row);
       const ov = ovMap.get(row.id) ?? null;
-      const effective = applyLifetimeXpOverrideReactive({ realComputedXp: real, override: ov });
+      const effective = applyLifetimeXpOverrideReactive({
+        realComputedXp: real,
+        override: ov,
+      });
       const lvl = this.computeLevel(effective);
       const displayName = this.displayName(d);
-      const phone = d.user?.phone ?? '';
+      const phone = d.user?.phone ?? "";
       combined.push({
         driverId: row.id,
         displayName,
@@ -358,23 +414,27 @@ export class GamificationService {
     if (q.length > 0) {
       filtered = combined.filter((r) => {
         const name = `${r.displayName}`.toLowerCase();
-        const ph = r.phone.toLowerCase().replace(/\D/g, '');
+        const ph = r.phone.toLowerCase().replace(/\D/g, "");
         return (
           name.includes(q) ||
           (digits.length > 0 && ph.includes(digits)) ||
-          (r.firstName ?? '').toLowerCase().includes(q) ||
-          (r.lastName ?? '').toLowerCase().includes(q)
+          (r.firstName ?? "").toLowerCase().includes(q) ||
+          (r.lastName ?? "").toLowerCase().includes(q)
         );
       });
     }
 
     filtered.sort((a, b) => {
-      if (b.lifetimeXpEffective !== a.lifetimeXpEffective) return b.lifetimeXpEffective - a.lifetimeXpEffective;
-      return a.displayName.localeCompare(b.displayName, 'uz');
+      if (b.lifetimeXpEffective !== a.lifetimeXpEffective)
+        return b.lifetimeXpEffective - a.lifetimeXpEffective;
+      return a.displayName.localeCompare(b.displayName, "uz");
     });
 
     const total = filtered.length;
-    const slice = filtered.slice((page - 1) * limit, (page - 1) * limit + limit);
+    const slice = filtered.slice(
+      (page - 1) * limit,
+      (page - 1) * limit + limit,
+    );
     const rows = slice.map((r, i) => ({
       rank: (page - 1) * limit + i + 1,
       ...r,
@@ -404,7 +464,7 @@ export class GamificationService {
       },
     });
     if (!driver) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
 
     const zoneId = driver.serviceZoneId;
@@ -422,7 +482,8 @@ export class GamificationService {
     ]);
     const lifetimeXp = xpResolved.effectiveXp;
     const level = this.computeLevel(lifetimeXp);
-    const xpBonusUzs = xpTiersPayload.find((x) => x.id === level.tier)?.bonusUzs ?? 0;
+    const xpBonusUzs =
+      xpTiersPayload.find((x) => x.id === level.tier)?.bonusUzs ?? 0;
 
     if (!zoneId) {
       return {
@@ -451,17 +512,18 @@ export class GamificationService {
       };
     }
 
-    const [monthlyBoardFull, myMonthTripsRaw, myMonthCancels] = await Promise.all([
-      this.buildLeaderboardOrdered(zoneId, monthStart, monthEnd),
-      this.prisma.trip.count({
-        where: {
-          driverId,
-          status: TripStatus.COMPLETED,
-          endedAt: { gte: monthStart, lt: monthEnd },
-        },
-      }),
-      this.countDriverCancels(driverId, monthStart, monthEnd),
-    ]);
+    const [monthlyBoardFull, myMonthTripsRaw, myMonthCancels] =
+      await Promise.all([
+        this.buildLeaderboardOrdered(zoneId, monthStart, monthEnd),
+        this.prisma.trip.count({
+          where: {
+            driverId,
+            status: TripStatus.COMPLETED,
+            endedAt: { gte: monthStart, lt: monthEnd },
+          },
+        }),
+        this.countDriverCancels(driverId, monthStart, monthEnd),
+      ]);
 
     const mi = monthlyBoardFull.findIndex((r) => r.driverId === driverId);
     const rankMonth = mi === -1 ? null : mi + 1;
@@ -471,7 +533,12 @@ export class GamificationService {
       try {
         return await this.prisma.driverLeaderboardOverride.findUnique({
           where: { driverId_periodYm: { driverId, periodYm: periodYmKey } },
-          select: { score: true, trips: true, baseTrips: true, baseCancels: true },
+          select: {
+            score: true,
+            trips: true,
+            baseTrips: true,
+            baseCancels: true,
+          },
         });
       } catch {
         return null;
@@ -484,7 +551,10 @@ export class GamificationService {
           realCancels: myMonthCancels,
           override: myOverride,
         })
-      : { trips: myMonthTripsRaw, score: scoreFromStats(myMonthTripsRaw, myMonthCancels) };
+      : {
+          trips: myMonthTripsRaw,
+          score: scoreFromStats(myMonthTripsRaw, myMonthCancels),
+        };
     const myMonthTrips = myComputed.trips;
     const myMonthlyScoreVal = myComputed.score;
 
@@ -498,7 +568,11 @@ export class GamificationService {
       periodYm: win.ym,
       periodMonthIsOverride,
       zone: driver.serviceZone
-        ? { id: driver.serviceZone.id, name: driver.serviceZone.name, slug: driver.serviceZone.slug }
+        ? {
+            id: driver.serviceZone.id,
+            name: driver.serviceZone.name,
+            slug: driver.serviceZone.slug,
+          }
         : null,
       periodMonth: {
         startsAt: monthStart.toISOString(),
@@ -530,7 +604,11 @@ export class GamificationService {
   }
 
   /** Haydovchi: oylik to‘liq ro‘yxatdan sahifa (offset/limit). */
-  async getMonthlyLeaderboardPage(driverId: string, offsetRaw: number, limitRaw: number) {
+  async getMonthlyLeaderboardPage(
+    driverId: string,
+    offsetRaw: number,
+    limitRaw: number,
+  ) {
     const driver = await this.prisma.driver.findUnique({
       where: { id: driverId },
       select: {
@@ -539,7 +617,7 @@ export class GamificationService {
       },
     });
     if (!driver) {
-      throw new NotFoundException('Driver not found');
+      throw new NotFoundException("Driver not found");
     }
     const zoneId = driver.serviceZoneId;
     if (!zoneId) {
@@ -551,7 +629,6 @@ export class GamificationService {
         items: [],
       };
     }
-    const now = new Date();
     const overrideYm = await this.championsYmOverride();
     const win = monthWindowFromYmUtc(overrideYm);
     const monthStart = win.from;
@@ -559,7 +636,11 @@ export class GamificationService {
     const offset = Math.max(0, Math.floor(offsetRaw) || 0);
     const limit = Math.min(50, Math.max(1, Math.floor(limitRaw) || 10));
 
-    const full = await this.buildLeaderboardOrdered(zoneId, monthStart, monthEnd);
+    const full = await this.buildLeaderboardOrdered(
+      zoneId,
+      monthStart,
+      monthEnd,
+    );
     const slice = full.slice(offset, offset + limit);
     const items = slice.map((r, i) => ({
       rank: offset + i + 1,
@@ -581,16 +662,27 @@ export class GamificationService {
   }
 
   /** Admin: zona + davr bo‘yicha batafsil leaderboard (telefon, bekorlar). */
-  async getAdminZoneLeaderboard(zoneId: string, period: 'week' | 'month') {
+  async getAdminZoneLeaderboard(zoneId: string, period: "week" | "month") {
     // Back-compat: return full list by using the paged method with a high cap
-    const page = await this.getAdminZoneLeaderboardPage(zoneId, period, 1, 400, undefined);
-    return { zone: page.zone, period: page.period, window: page.window, rows: page.rows };
+    const page = await this.getAdminZoneLeaderboardPage(
+      zoneId,
+      period,
+      1,
+      400,
+      undefined,
+    );
+    return {
+      zone: page.zone,
+      period: page.period,
+      window: page.window,
+      rows: page.rows,
+    };
   }
 
   /** Admin: paged leaderboard (server-side) — 20tadan; qidiruv name/phone. */
   async getAdminZoneLeaderboardPage(
     zoneId: string,
-    period: 'week' | 'month',
+    period: "week" | "month",
     pageRaw: number,
     limitRaw: number,
     searchRaw?: string,
@@ -600,23 +692,23 @@ export class GamificationService {
       select: { id: true, name: true, slug: true },
     });
     if (!zone) {
-      throw new NotFoundException('Zone not found');
+      throw new NotFoundException("Zone not found");
     }
     const now = new Date();
     const overrideYm = await this.championsYmOverride();
-    const win = period === 'month' ? monthWindowFromYmUtc(overrideYm) : null;
-    const from = period === 'week' ? startOfIsoWeekUtc(now) : win!.from;
-    const to = period === 'week' ? endOfIsoWeekUtc(now) : win!.to;
+    const win = period === "month" ? monthWindowFromYmUtc(overrideYm) : null;
+    const from = period === "week" ? startOfIsoWeekUtc(now) : win!.from;
+    const to = period === "week" ? endOfIsoWeekUtc(now) : win!.to;
     const page = Math.max(1, Math.floor(pageRaw) || 1);
     const limit = Math.min(100, Math.max(1, Math.floor(limitRaw) || 20));
     const offset = (page - 1) * limit;
-    const search = (searchRaw ?? '').trim().toLowerCase();
-    const searchDigits = search.replace(/\D/g, '');
-    const isMonth = period === 'month';
+    const search = (searchRaw ?? "").trim().toLowerCase();
+    const searchDigits = search.replace(/\D/g, "");
+    const isMonth = period === "month";
     const ym = ymUtc(from);
 
     const tripsGrouped = await this.prisma.trip.groupBy({
-      by: ['driverId'],
+      by: ["driverId"],
       where: {
         status: TripStatus.COMPLETED,
         endedAt: { gte: from, lt: to },
@@ -642,7 +734,7 @@ export class GamificationService {
     const driverIds = withTrips.map((g) => g.driverId);
 
     const cancelsGrouped = await this.prisma.order.groupBy({
-      by: ['assignedDriverId'],
+      by: ["assignedDriverId"],
       where: {
         assignedDriverId: { in: driverIds },
         status: OrderStatus.CANCELLED_BY_DRIVER,
@@ -672,7 +764,13 @@ export class GamificationService {
       try {
         return await this.prisma.driverLeaderboardOverride.findMany({
           where: { periodYm: ym, driverId: { in: driverIds } },
-          select: { driverId: true, score: true, trips: true, baseTrips: true, baseCancels: true },
+          select: {
+            driverId: true,
+            score: true,
+            trips: true,
+            baseTrips: true,
+            baseCancels: true,
+          },
         });
       } catch {
         return [];
@@ -719,7 +817,7 @@ export class GamificationService {
           const name = r.displayName.toLowerCase();
           if (phone.includes(search) || name.includes(search)) return true;
           if (searchDigits.length) {
-            const digits = r.phone.replace(/\D/g, '');
+            const digits = r.phone.replace(/\D/g, "");
             return digits.includes(searchDigits);
           }
           return false;
@@ -761,7 +859,7 @@ export class GamificationService {
     const ends = endOfQuarterUtc(now);
     const dateStr = ends.toISOString().slice(0, 10);
     const settings = await this.prisma.platformSettings.findUnique({
-      where: { id: 'default' },
+      where: { id: "default" },
       select: {
         championsSeasonTitleUz: true,
         championsPrizeDescriptionUz: true,
@@ -771,20 +869,26 @@ export class GamificationService {
       },
     });
     const defaultPrizeHint =
-      'Har chorak oxirida zonangiz bo‘yicha eng yuqori natija ko‘rsatgan haydovchilar orasidan tanlov — sovrin fondi $100 (platforma qoidalariga muvofiq).';
+      "Har chorak oxirida zonangiz bo‘yicha eng yuqori natija ko‘rsatgan haydovchilar orasidan tanlov — sovrin fondi $100 (platforma qoidalariga muvofiq).";
     const defaultCadence =
-      'Chempionlar oylik jadvali kalendarya oy bo‘yicha; yangi oyda hisoblar yangilanadi.';
+      "Chempionlar oylik jadvali kalendarya oy bo‘yicha; yangi oyda hisoblar yangilanadi.";
     const tpl = settings?.championsPeriodEndTemplateUz?.trim();
     const periodEndLabelUz =
       tpl && tpl.length > 0
         ? tpl.replace(/\{\{DATE\}\}/g, dateStr).replace(/\{date\}/gi, dateStr)
         : `Chorak tugashi (taxmin): ${dateStr}`;
     return {
-      titleUz: (settings?.championsSeasonTitleUz?.trim() || 'Choraklik sovrin').trim(),
+      titleUz: (
+        settings?.championsSeasonTitleUz?.trim() || "Choraklik sovrin"
+      ).trim(),
       quarterEndsAt: ends.toISOString(),
       prizeUsd: settings?.championsPrizeUsd ?? 100,
-      prizeHintUz: (settings?.championsPrizeDescriptionUz?.trim() || defaultPrizeHint).trim(),
-      cadenceHintUz: (settings?.championsCadenceHintUz?.trim() || defaultCadence).trim(),
+      prizeHintUz: (
+        settings?.championsPrizeDescriptionUz?.trim() || defaultPrizeHint
+      ).trim(),
+      cadenceHintUz: (
+        settings?.championsCadenceHintUz?.trim() || defaultCadence
+      ).trim(),
       periodEndLabelUz,
     };
   }
@@ -793,18 +897,21 @@ export class GamificationService {
     const tiers = XP_TIER_DEFINITIONS;
     let idx = 0;
     for (let i = tiers.length - 1; i >= 0; i--) {
-      if (xp >= tiers[i]!.minXp) {
+      if (xp >= tiers[i].minXp) {
         idx = i;
         break;
       }
     }
-    const current = tiers[idx]!;
+    const current = tiers[idx];
     const nextTierXp = tiers[idx + 1]?.minXp ?? null;
     let progressPct = 100;
     if (nextTierXp != null) {
       const span = nextTierXp - current.minXp;
       const within = xp - current.minXp;
-      progressPct = Math.min(100, Math.max(0, Math.round(span > 0 ? (within / span) * 100 : 0)));
+      progressPct = Math.min(
+        100,
+        Math.max(0, Math.round(span > 0 ? (within / span) * 100 : 0)),
+      );
     }
     return {
       tier: current.id,
@@ -849,17 +956,22 @@ export class GamificationService {
       ),
     ]);
 
-    const tripMinutes = Math.max(0, Math.round(Number(tripMinutesRow?.[0]?.minutes ?? 0)));
+    const tripMinutes = Math.max(
+      0,
+      Math.round(Number(tripMinutesRow?.[0]?.minutes ?? 0)),
+    );
     const onlineMinutesProxy = Math.max(0, Math.round(pingCount * 2));
     const xp =
-      trips * 10 +
-      tripMinutes * 1 +
-      Math.round(onlineMinutesProxy * 0.2);
+      trips * 10 + tripMinutes * 1 + Math.round(onlineMinutesProxy * 0.2);
 
     return { trips, tripMinutes, onlineMinutesProxy, xp };
   }
 
-  private async countDriverCancels(driverId: string, from: Date, to: Date): Promise<number> {
+  private async countDriverCancels(
+    driverId: string,
+    from: Date,
+    to: Date,
+  ): Promise<number> {
     return this.prisma.order.count({
       where: {
         assignedDriverId: driverId,
@@ -869,11 +981,13 @@ export class GamificationService {
     });
   }
 
-  private async buildLeaderboardOrdered(zoneId: string, from: Date, to: Date): Promise<
-    (RowAgg & { score: number })[]
-  > {
+  private async buildLeaderboardOrdered(
+    zoneId: string,
+    from: Date,
+    to: Date,
+  ): Promise<(RowAgg & { score: number })[]> {
     const grouped = await this.prisma.trip.groupBy({
-      by: ['driverId'],
+      by: ["driverId"],
       where: {
         status: TripStatus.COMPLETED,
         endedAt: { gte: from, lt: to },
@@ -914,16 +1028,29 @@ export class GamificationService {
             periodYm,
             driver: { serviceZoneId: zoneId },
           },
-          select: { driverId: true, score: true, trips: true, baseTrips: true, baseCancels: true },
+          select: {
+            driverId: true,
+            score: true,
+            trips: true,
+            baseTrips: true,
+            baseCancels: true,
+          },
         });
       } catch {
         // Safety: if migration hasn't run yet, ignore overrides.
         return [];
       }
     })();
-    const overrideById = new Map<string, { driverId: string; score: number; trips: number; baseTrips?: number | null; baseCancels?: number | null }>(
-      overrides.map((o) => [o.driverId, o]),
-    );
+    const overrideById = new Map<
+      string,
+      {
+        driverId: string;
+        score: number;
+        trips: number;
+        baseTrips?: number | null;
+        baseCancels?: number | null;
+      }
+    >(overrides.map((o) => [o.driverId, o]));
 
     const rows: (RowAgg & { score: number })[] = [];
     for (const g of withTrips) {
@@ -968,8 +1095,8 @@ export class GamificationService {
     const fn = d.firstName?.trim();
     const ln = d.lastName?.trim();
     if (fn || ln) {
-      const bit = ln ? `${ln.charAt(0)}.` : '';
-      return [fn, bit].filter(Boolean).join(' ');
+      const bit = ln ? `${ln.charAt(0)}.` : "";
+      return [fn, bit].filter(Boolean).join(" ");
     }
     const p = d.user.phone;
     const tail = p.length >= 4 ? p.slice(-4) : p;
