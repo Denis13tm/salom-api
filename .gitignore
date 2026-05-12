@@ -7,6 +7,7 @@ coverage
 .idea
 .vscode
 *.log
+**/.DS_Store
 var/
 *.tsbuildinfo
 prisma/seed.js
