@@ -50,7 +50,7 @@ async function bootstrap() {
   const onRender = Boolean(process.env.RENDER?.trim()) || Boolean(process.env.RENDER_SERVICE_ID?.trim());
   if (onRender && uploadsUseDefaultEphemeralPaths()) {
     logger.warn(
-      'SALOM_UPLOAD_ROOT yoki DRIVER_DOC_UPLOAD_DIR o‘rnatilmagan — har deployda konteyner ichidagi var/ tozalanadi. Render’da Web Service → Disks → persistent disk qo‘shing va SALOM_UPLOAD_ROOT ni mount yo‘liga qo‘ying (apps/api/render.yaml namuna).',
+      'SALOM_UPLOAD_ROOT yoki DRIVER_DOC_UPLOAD_DIR o‘rnatilmagan — har deployda konteyner ichidagi var/ tozalanadi. Render’da Web Service → Disks → persistent disk qo‘shing va SALOM_UPLOAD_ROOT ni mount yo‘liga qo‘ying (render.yaml).',
     );
   }
 
