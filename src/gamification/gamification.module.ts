@@ -4,10 +4,11 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { TrackingModule } from "../tracking/tracking.module";
 import { DriverChampionsController } from "./driver-champions.controller";
 import { GamificationService } from "./gamification.service";
+import { PublicChampionsBannersController } from "./public-champions-banners.controller";
 
 @Module({
   imports: [PrismaModule, TrackingModule, AuthModule],
-  controllers: [DriverChampionsController],
+  controllers: [DriverChampionsController, PublicChampionsBannersController],
   providers: [GamificationService],
   exports: [GamificationService],
 })

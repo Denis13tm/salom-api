@@ -21,7 +21,7 @@ import {
 import { randomInt, randomUUID } from "node:crypto";
 import * as bcrypt from "bcrypt";
 import { createReadStream } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, mkdir, unlink, writeFile } from "node:fs/promises";
 import type { ReadStream } from "node:fs";
 import * as path from "node:path";
 import { SmsService } from "../notifications/sms.service";
@@ -44,6 +44,12 @@ import type { UpdatePickupPricingRingDto } from "./dto/update-pricing-ring.dto";
 import { PricingEngineService } from "../orders/pricing-engine.service";
 import { GamificationService } from "../gamification/gamification.service";
 import type { PatchDriverXpSettingsDto } from "./dto/patch-driver-xp-settings.dto";
+import type { Express } from "express";
+import {
+  CHAMPIONS_BANNER_FILE_RE,
+  championsBannerUploadDir,
+  parseBannerPathsJson,
+} from "../gamification/champions-banners.util";
 
 function startOfUtcDay(d: Date): Date {
   return new Date(
@@ -188,6 +194,8 @@ export class AdminService {
         championsCadenceHintUz: true,
         championsPrizeUsd: true,
         championsPeriodEndTemplateUz: true,
+        championsHomeBannerPathsJson: true,
+        championsHomeCarouselIntervalSec: true,
       },
     });
     return {
@@ -196,6 +204,8 @@ export class AdminService {
       championsCadenceHintUz: row?.championsCadenceHintUz ?? null,
       championsPrizeUsd: row?.championsPrizeUsd ?? 100,
       championsPeriodEndTemplateUz: row?.championsPeriodEndTemplateUz ?? null,
+      championsHomeBannerPaths: parseBannerPathsJson(row?.championsHomeBannerPathsJson),
+      championsHomeCarouselIntervalSec: row?.championsHomeCarouselIntervalSec ?? 5,
       /** Qo‘llanma */
       templateHint:
         "Sana uchun `{{DATE}}` yoki `{date}` placeholders — chorak oxiri (YYYY-MM-DD) bilan almashtiriladi.",
@@ -212,6 +222,7 @@ export class AdminService {
         platformCommissionBps: true,
         commissionWalletMinBroadcastBalanceUzs: true,
         commissionWalletLowBalanceUzs: true,
+        championsHomeBannerPathsJson: true,
       },
     });
     const envBps = this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000);
@@ -229,7 +240,9 @@ export class AdminService {
       body.championsPrizeDescriptionUz !== undefined ||
       body.championsCadenceHintUz !== undefined ||
       body.championsPrizeUsd !== undefined ||
-      body.championsPeriodEndTemplateUz !== undefined;
+      body.championsPeriodEndTemplateUz !== undefined ||
+      body.championsHomeBannerPaths !== undefined ||
+      body.championsHomeCarouselIntervalSec !== undefined;
     if (!touched) {
       return this.platformChampionsConfig();
     }
@@ -239,6 +252,22 @@ export class AdminService {
       const t = s.trim();
       return t.length === 0 ? null : t;
     };
+
+    const prevPaths = parseBannerPathsJson(existing?.championsHomeBannerPathsJson);
+    let nextNormalizedPaths: string[] | undefined;
+    if (body.championsHomeBannerPaths !== undefined) {
+      nextNormalizedPaths = this.normalizeChampionsHomeBannerPaths(body.championsHomeBannerPaths);
+      for (const p of prevPaths) {
+        if (!nextNormalizedPaths.includes(p)) {
+          void this.unlinkChampionBannerFile(p).catch(() => undefined);
+        }
+      }
+    }
+
+    const intervalPatch =
+      body.championsHomeCarouselIntervalSec !== undefined
+        ? Math.min(60, Math.max(3, Math.trunc(body.championsHomeCarouselIntervalSec)))
+        : undefined;
 
     await this.prisma.platformSettings.upsert({
       where: { id: "default" },
@@ -259,6 +288,10 @@ export class AdminService {
         championsPrizeUsd: body.championsPrizeUsd ?? 100,
         championsPeriodEndTemplateUz:
           trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
+        championsHomeCarouselIntervalSec: intervalPatch ?? 5,
+        ...(nextNormalizedPaths !== undefined
+          ? { championsHomeBannerPathsJson: nextNormalizedPaths }
+          : {}),
       },
       update: {
         ...(body.championsSeasonTitleUz !== undefined && {
@@ -283,6 +316,12 @@ export class AdminService {
           championsPeriodEndTemplateUz:
             trimOrNull(body.championsPeriodEndTemplateUz) ?? null,
         }),
+        ...(nextNormalizedPaths !== undefined && {
+          championsHomeBannerPathsJson: nextNormalizedPaths,
+        }),
+        ...(intervalPatch !== undefined && {
+          championsHomeCarouselIntervalSec: intervalPatch,
+        }),
       },
     });
     await this.writeAudit(
@@ -293,6 +332,121 @@ export class AdminService {
       {
         patch: body,
         settingsRowId: "default",
+      },
+    );
+    return this.platformChampionsConfig();
+  }
+
+  private normalizeChampionsHomeBannerPaths(raw: string[]): string[] {
+    const out: string[] = [];
+    for (const x of raw) {
+      const t = (x ?? "").trim();
+      if (!CHAMPIONS_BANNER_FILE_RE.test(t)) {
+        throw new BadRequestException(`Noto‘g‘ri banner fayl nomi: ${String(x)}`);
+      }
+      out.push(t);
+    }
+    if (out.length > 12) {
+      throw new BadRequestException("Eng ko‘pi bilan 12 ta banner");
+    }
+    return out;
+  }
+
+  private async unlinkChampionBannerFile(filename: string): Promise<void> {
+    if (!CHAMPIONS_BANNER_FILE_RE.test(filename)) return;
+    const full = path.join(championsBannerUploadDir(), filename);
+    try {
+      await unlink(full);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async uploadChampionsHomeBannerFile(
+    file: Express.Multer.File | undefined,
+    actorUserId?: string,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException("file maydoni majburiy");
+    }
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (![".png", ".jpg", ".jpeg", ".webp"].includes(ext)) {
+      throw new BadRequestException("Faqat png, jpg, jpeg, webp");
+    }
+    const name = `${randomUUID()}${ext}`;
+    const dir = championsBannerUploadDir();
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, name), file.buffer);
+
+    const row = await this.prisma.platformSettings.findUnique({
+      where: { id: "default" },
+      select: { championsHomeBannerPathsJson: true },
+    });
+    const cur = parseBannerPathsJson(row?.championsHomeBannerPathsJson);
+    if (cur.length >= 12) {
+      throw new BadRequestException("Eng ko‘pi bilan 12 ta banner");
+    }
+    const next = [...cur, name];
+
+    await this.prisma.platformSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        platformCommissionBps: this.config.get<number>("PLATFORM_COMMISSION_BPS", 1000),
+        commissionWalletMinBroadcastBalanceUzs: this.config.get<number>(
+          "COMMISSION_WALLET_MIN_BROADCAST_BALANCE_UZS",
+          10_000,
+        ),
+        commissionWalletLowBalanceUzs: this.config.get<number>(
+          "COMMISSION_WALLET_LOW_BALANCE_UZS",
+          30_000,
+        ),
+        championsHomeBannerPathsJson: next,
+      },
+      update: { championsHomeBannerPathsJson: next },
+    });
+    await this.writeAudit(
+      actorUserId,
+      "platform.champions_banner_upload",
+      "PlatformSettings",
+      null,
+      {
+        filename: name,
+      },
+    );
+    return {
+      filename: name,
+      url: `/api/v1/public/champions-banners/${name}`,
+      paths: next,
+    };
+  }
+
+  async deleteChampionsHomeBannerFile(filename: string, actorUserId?: string) {
+    const base = path.basename(filename || "");
+    if (!CHAMPIONS_BANNER_FILE_RE.test(base)) {
+      throw new BadRequestException("Noto‘g‘ri fayl nomi");
+    }
+    const row = await this.prisma.platformSettings.findUnique({
+      where: { id: "default" },
+      select: { championsHomeBannerPathsJson: true },
+    });
+    const cur = parseBannerPathsJson(row?.championsHomeBannerPathsJson);
+    if (!cur.includes(base)) {
+      throw new NotFoundException("Banner ro‘yxatda yo‘q");
+    }
+    const next = cur.filter((x) => x !== base);
+    await this.prisma.platformSettings.update({
+      where: { id: "default" },
+      data: { championsHomeBannerPathsJson: next },
+    });
+    await this.unlinkChampionBannerFile(base);
+    await this.writeAudit(
+      actorUserId,
+      "platform.champions_banner_delete",
+      "PlatformSettings",
+      null,
+      {
+        filename: base,
       },
     );
     return this.platformChampionsConfig();

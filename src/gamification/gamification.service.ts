@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { OrderStatus, TripStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { bannerPathsToPublicUrls, parseBannerPathsJson } from "./champions-banners.util";
 
 /** Chempionlar tab preview — qolganlari /monthly-leaderboard orqali */
 const MONTHLY_PREVIEW_TOP = 5;
@@ -866,6 +867,8 @@ export class GamificationService {
         championsCadenceHintUz: true,
         championsPrizeUsd: true,
         championsPeriodEndTemplateUz: true,
+        championsHomeBannerPathsJson: true,
+        championsHomeCarouselIntervalSec: true,
       },
     });
     const defaultPrizeHint =
@@ -877,6 +880,9 @@ export class GamificationService {
       tpl && tpl.length > 0
         ? tpl.replace(/\{\{DATE\}\}/g, dateStr).replace(/\{date\}/gi, dateStr)
         : `Chorak tugashi (taxmin): ${dateStr}`;
+    const bannerPaths = parseBannerPathsJson(settings?.championsHomeBannerPathsJson);
+    const intervalRaw = settings?.championsHomeCarouselIntervalSec ?? 5;
+    const intervalSec = Math.min(60, Math.max(3, Math.trunc(Number(intervalRaw)) || 5));
     return {
       titleUz: (
         settings?.championsSeasonTitleUz?.trim() || "Choraklik sovrin"
@@ -890,6 +896,10 @@ export class GamificationService {
         settings?.championsCadenceHintUz?.trim() || defaultCadence
       ).trim(),
       periodEndLabelUz,
+      homeCarousel: {
+        intervalSec,
+        imageUrls: bannerPathsToPublicUrls(bannerPaths),
+      },
     };
   }
 

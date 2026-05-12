@@ -488,6 +488,10 @@ model PlatformSettings {
   championsPeriodEndTemplateUz           String?  @db.VarChar(800)
   /// Test / admin: oylik leaderboard davrini qo‘lda boshlab tugatish (UTC). `YYYY-MM` format.
   championsPeriodYmOverride              String?  @db.VarChar(7)
+  /// Chempionlar: sovrin kartasidan keyingi banner karusel (fayl nomlari, masalan uuid.png).
+  championsHomeBannerPathsJson           Json?
+  /// Bannerlar orasidagi avtomatik almashish intervali (sekund), 3–60.
+  championsHomeCarouselIntervalSec       Int      @default(5)
   /// Haydovchi ilovasi: XP tier ekranida ko‘rsatiladigan bonus (so‘m) — admin o‘zgartiradi.
   driverXpBonusUzs                     Int      @default(0)
   /// Har bir tier (`STARTER`, `BRONZE`, …) uchun bonus (so‘m). Bo‘sh bo‘lsa `driverXpBonusUzs` barcha tierga qo‘llanadi.

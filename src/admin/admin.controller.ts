@@ -87,6 +87,29 @@ export class AdminController {
     return this.admin.patchPlatformChampions(body, req.salomAdminUserId);
   }
 
+  @Post("config/champions/banners/upload")
+  @HttpCode(200)
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  uploadChampionsBanner(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: Request,
+  ) {
+    return this.admin.uploadChampionsHomeBannerFile(file, req.salomAdminUserId);
+  }
+
+  @Delete("config/champions/banners/:filename")
+  @HttpCode(200)
+  deleteChampionsBanner(
+    @Param("filename") filename: string,
+    @Req() req: Request,
+  ) {
+    return this.admin.deleteChampionsHomeBannerFile(filename, req.salomAdminUserId);
+  }
+
   @Get("gamification/leaderboard")
   async adminLeaderboard(
     @Query("zoneId") zoneId: string,

@@ -1,12 +1,5 @@
-import { Type } from "class-transformer";
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from "class-validator";
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class PatchPlatformChampionsDto {
   @IsOptional()
@@ -36,4 +29,20 @@ export class PatchPlatformChampionsDto {
   @IsString()
   @MaxLength(800)
   championsPeriodEndTemplateUz?: string;
+
+  /** Banner fayl nomlari (serverda `var/champions-banners`), tartib karusel tartibi. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsString({ each: true })
+  @MaxLength(160, { each: true })
+  championsHomeBannerPaths?: string[];
+
+  /** Karusel avtomatik almashish (sekund), 3–60. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(3)
+  @Max(60)
+  championsHomeCarouselIntervalSec?: number;
 }
